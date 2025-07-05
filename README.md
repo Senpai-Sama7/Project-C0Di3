@@ -1,11 +1,14 @@
 <p align="center">
-  <img src="assets/cyber-agent-logo.png" alt="Cybersecurity AI Agent" width="300"/>
+  <img src="assets/cyber-agent-logo.jpg" alt="Cybersecurity AI Agent" width="300"/>
 </p>
 
-## CyberSentinel AI ##
+         ## CyberSentinel AI ##
+         
+![AI-Powered](https://img.shields.io/badge/AI-Powered-blue)
+![Cyber Defense](https://img.shields.io/badge/Cyber_Defense-Enabled-green)
 
 ---
-Your autonomous cybersecurity defense system powered by machine learning, intelligent threat detection, and digital stealth.
+Your autonomous Top Flight security system powered by machine learning, intelligent threat detection, and digital stealth.
 ----
 
 
