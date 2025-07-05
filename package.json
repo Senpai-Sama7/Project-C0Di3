@@ -1,0 +1,24 @@
+{
+  "scripts": {
+    "start": "ts-node gemini-agent.ts",
+    "setup": "bash install.sh"
+  },
+  "bin": {
+    "core-agent": "./bin/cli.js"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "dotenv": "^17.0.1",
+    "fs-extra": "^11.3.0",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.10",
+    "@types/pg": "^8.15.4",
+    "jest": "^30.0.4",
+    "ts-jest": "^29.4.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "logging": {
+    "level": "info",
+    "auditLogDir": "./data/logs"
+  },
+  "memory": {
+    "vectorStore": "inmemory",
+    "persistencePath": "./data/memory",
+    "cachingEnabled": true,
+    "embeddingModel": "embedding-001"
+  },
+  "agent": {
+    "encryptionKey": "YOUR_HEX_ENCODED_32_BYTE_KEY"
+  }
+}
