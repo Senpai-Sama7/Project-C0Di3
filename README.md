@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="assets/cyber-agent-logo.png" alt="Cybersecurity AI Agent" width="300"/>
+</p>
+
+## CyberSentinel AI ##
+
+---
+Your autonomous cybersecurity defense system powered by machine learning, intelligent threat detection, and digital stealth.
+----
+
+
+
 # Core Agent: Your Cybersecurity Intelligence Revolution
 
 *What if your security operations could think, learn, and evolve like a seasoned expert—but never sleep, never forget, and never miss a pattern?*
