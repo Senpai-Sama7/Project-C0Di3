@@ -33,4 +33,19 @@ export class ProceduralMemory implements IMemory {
   async clear(): Promise<void> {
     this.procedures.clear();
   }
+
+  async remove(key: string): Promise<void> {
+    this.procedures.delete(key);
+  }
+
+  async count(): Promise<number> {
+    return this.procedures.size;
+  }
+
+  async update(key: string, newProcedure: Function): Promise<void> {
+    if (!this.procedures.has(key)) {
+      throw new Error(`Procedure with key ${key} not found.`);
+    }
+    this.procedures.set(key, newProcedure);
+  }
 }

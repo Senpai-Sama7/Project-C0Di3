@@ -22,4 +22,21 @@ export class WorkingMemory {
   clear(): void {
     this.items = [];
   }
+
+  remove(key: string): void {
+    this.items = this.items.filter(item => item.key !== key);
+  }
+
+  count(): number {
+    return this.items.length;
+  }
+
+  update(key: string, newItem: MemoryItem): void {
+    const index = this.items.findIndex(item => item.key === key);
+    if (index !== -1) {
+      this.items[index] = newItem;
+    } else {
+      throw new Error(`Item with key ${key} not found.`);
+    }
+  }
 }

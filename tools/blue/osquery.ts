@@ -14,8 +14,17 @@ export const OsqueryTool: Tool = {
 
     return new Promise((resolve, reject) => {
       exec(`osqueryi --json "${query}" ${options}`, { timeout: 60000 }, (err, stdout, stderr) => {
-        if (err) return reject(stderr || err.message);
-        resolve({ summary: stdout.split('\n').slice(0, 10).join('\n'), full: stdout });
+        if (err) {
+          console.error('Osquery execution error:', stderr || err.message);
+          return reject(new Error(stderr || err.message));
+        }
+        const summary = stdout.split('\n').slice(0, 10).join('\n');
+        console.info('Osquery execution success:', summary);
+        resolve({
+          summary,
+          full: stdout,
+          success: true
+        });
       });
     });
   }

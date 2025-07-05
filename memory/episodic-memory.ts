@@ -28,4 +28,21 @@ export class EpisodicMemory implements IMemory {
   async clear(): Promise<void> {
     this.events = [];
   }
+
+  async remove(key: string): Promise<void> {
+    this.events = this.events.filter(event => event.key !== key);
+  }
+
+  async count(): Promise<number> {
+    return this.events.length;
+  }
+
+  async update(key: string, newItem: MemoryItem): Promise<void> {
+    const index = this.events.findIndex(event => event.key === key);
+    if (index !== -1) {
+      this.events[index] = newItem;
+    } else {
+      throw new Error(`Item with key ${key} not found.`);
+    }
+  }
 }

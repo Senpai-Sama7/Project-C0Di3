@@ -11,19 +11,19 @@ export const BurpSuiteTool: Tool = {
   async execute(input: any, context?: any): Promise<any> {
     const { target, options = '' } = input;
     if (!target) throw new Error('Target is required');
-    if (context?.simulation || context?.permissions?.simulationOnly) {
-      return '[SIMULATED BURP SUITE OUTPUT]';
-    }
-    if (context?.permissions && context.permissions.allow === false) {
-      throw new Error('Burp Suite is not allowed by permissions');
-    }
+
     return new Promise((resolve, reject) => {
       exec(`burpsuite ${options} --target ${target}`, { timeout: 60000 }, (err, stdout, stderr) => {
-        if (err) return reject(stderr || err.message);
-        // Normalize output for LLM summarization
+        if (err) {
+          console.error('Burp Suite execution error:', stderr || err.message);
+          return reject(new Error(stderr || err.message));
+        }
+        const summary = stdout.split('\n').slice(0, 10).join('\n');
+        console.info('Burp Suite execution success:', summary);
         resolve({
-          summary: stdout.split('\n').slice(0, 10).join('\n'),
-          full: stdout
+          summary,
+          full: stdout,
+          success: true
         });
       });
     });

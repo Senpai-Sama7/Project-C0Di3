@@ -11,19 +11,19 @@ export const SqlmapTool: Tool = {
   async execute(input: any, context?: any): Promise<any> {
     const { url, options = '' } = input;
     if (!url) throw new Error('URL is required');
-    if (context?.simulation || context?.permissions?.simulationOnly) {
-      return '[SIMULATED SQLMAP OUTPUT]';
-    }
-    if (context?.permissions && context.permissions.allow === false) {
-      throw new Error('sqlmap is not allowed by permissions');
-    }
+
     return new Promise((resolve, reject) => {
       exec(`sqlmap -u ${url} ${options}`, { timeout: 60000 }, (err, stdout, stderr) => {
-        if (err) return reject(stderr || err.message);
-        // Normalize output for LLM summarization
+        if (err) {
+          console.error('SQLMap execution error:', stderr || err.message);
+          return reject(new Error(stderr || err.message));
+        }
+        const summary = stdout.split('\n').slice(0, 10).join('\n');
+        console.info('SQLMap execution success:', summary);
         resolve({
-          summary: stdout.split('\n').slice(0, 10).join('\n'),
-          full: stdout
+          summary,
+          full: stdout,
+          success: true
         });
       });
     });

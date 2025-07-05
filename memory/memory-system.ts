@@ -66,14 +66,15 @@ export class MemorySystem {
   }
 
   private createVectorStore(options: MemorySystemOptions): VectorStore {
-    switch (options.vectorStore?.toLowerCase()) {
+    switch (options.vectorStoreType) {
       case 'chromadb':
         return new ChromaDBVectorStore();
-      case 'postgres':
-        return new PostgresVectorStore();
       case 'inmemory':
-      default:
         return new InMemoryVectorStore();
+      case 'postgres':
+        return new PostgresVectorStore(options.connectionString);
+      default:
+        throw new Error(`Unsupported vector store type: ${options.vectorStoreType}`);
     }
   }
 
@@ -92,6 +93,30 @@ export class MemorySystem {
 
     this.initialized = true;
     this.logger.info('Memory system initialized successfully');
+  }
+
+  private async initializeMemoryComponents(): Promise<void> {
+    if (this.initialized) {
+      this.logger.warn('Memory components are already initialized.');
+      return;
+    }
+
+    try {
+      await this.memoryCache.load();
+      this.logger.info('Memory cache loaded successfully.');
+
+      // Initialize other memory components
+      this.semanticMemory.clear();
+      this.episodicMemory.clear();
+      this.proceduralMemory.clear();
+      this.workingMemory.clear();
+
+      this.initialized = true;
+      this.logger.info('Memory components initialized successfully.');
+    } catch (error) {
+      this.logger.error('Failed to initialize memory components:', error);
+      throw error;
+    }
   }
 
   /**
@@ -285,6 +310,15 @@ export class MemorySystem {
     this.logger.info('Memory persistence completed');
   }
 
+  public async persistMemory(): Promise<void> {
+    try {
+      await this.memoryCache.persist();
+      this.logger.info('Memory cache persisted successfully.');
+    } catch (error) {
+      this.logger.error('Failed to persist memory cache:', error);
+    }
+  }
+
   /**
    * Generate memory statistics
    */
@@ -306,19 +340,24 @@ export class MemorySystem {
       cacheHitRate: this.memoryCache.hitRate()
     };
   }
+
+  public async retrieveMemoryStatistics(): Promise<MemoryStatistics> {
+    return {
+      cacheHitRate: this.memoryCache.hitRate(),
+      cacheSize: this.memoryCache.size(),
+      vectorStoreType: this.vectorStore.constructor.name,
+    };
+  }
 }
 
 export interface MemorySystemOptions {
-  vectorStore?: string;
+  eventBus?: EventBus;
   persistencePath?: string;
-  connectionString?: string;
-  tableName?: string;
-  cachingEnabled?: boolean;
   cacheSize?: number;
   cacheTTL?: number;
+  vectorStoreType?: 'chromadb' | 'inmemory' | 'postgres';
+  connectionString?: string;
   workingMemoryCapacity?: number;
-  embeddingModel?: string;
-  eventBus?: EventBus;
 }
 
 export interface RetrieveOptions {
