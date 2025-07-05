@@ -2,8 +2,9 @@
   <img src="assets/cyber-agent-logo.jpg" alt="Cybersecurity AI Agent" width="300"/>
 </p>
 
-         ## CyberSentinel AI ##
-         
+---
+## **C0DI3** - your computer's personal security
+---         
 ![AI-Powered](https://img.shields.io/badge/AI-Powered-blue)
 ![Cyber Defense](https://img.shields.io/badge/Cyber_Defense-Enabled-green)
 
