@@ -39,6 +39,12 @@ Health & Monitoring:
 Knowledge & Memory:
   --ingest-book <path>      Ingest a book into the agent's knowledge base
 
+Cybersecurity Knowledge:
+  --cyber-query <query>     Query cybersecurity knowledge from books
+  --cyber-stats             Show cybersecurity knowledge statistics
+  --cyber-concepts          List all cybersecurity concepts
+  --cyber-category <cat>    List concepts by category (red-team, blue-team, etc.)
+
 Help:
   --help, -h                Show this help message
 `);
@@ -154,6 +160,100 @@ Help:
       console.log('✅ Book ingested successfully.');
     } catch (error) {
       console.error('❌ Failed to ingest book:', error.message);
+    }
+    process.exit(0);
+  }
+
+  // Cybersecurity Knowledge Commands
+  const cyberQueryIndex = args.indexOf('--cyber-query');
+  if (cyberQueryIndex !== -1 && args[cyberQueryIndex + 1]) {
+    const query = args[cyberQueryIndex + 1];
+    console.log(`\n🔍 Querying cybersecurity knowledge: "${query}"`);
+    try {
+      const result = await agent.queryCybersecurityKnowledge(query, {
+        maxResults: 5,
+        includeCode: true,
+        includeTechniques: true
+      });
+
+      console.log('\n📊 Cybersecurity Knowledge Results:');
+      console.log(`Found ${result.concepts.length} relevant concepts`);
+      console.log(`Techniques: ${result.techniques.join(', ')}`);
+      console.log(`Tools: ${result.tools.join(', ')}`);
+      console.log(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+      console.log(`Sources: ${result.sources.join(', ')}`);
+
+      if (result.concepts.length > 0) {
+        console.log('\n📖 Top Concepts:');
+        result.concepts.slice(0, 3).forEach((concept, index) => {
+          console.log(`${index + 1}. ${concept.name} (${concept.category})`);
+          console.log(`   ${concept.description}`);
+          console.log(`   Source: ${concept.source}`);
+        });
+      }
+    } catch (error) {
+      console.error('❌ Failed to query cybersecurity knowledge:', error.message);
+    }
+    process.exit(0);
+  }
+
+  if (args.includes('--cyber-stats')) {
+    console.log('\n📊 Cybersecurity Knowledge Statistics:');
+    try {
+      const stats = agent.getCybersecurityKnowledgeStatistics();
+      console.log(`Total Concepts: ${stats.totalConcepts}`);
+      console.log('Concepts by Category:');
+      Object.entries(stats.conceptsByCategory).forEach(([category, count]) => {
+        console.log(`  ${category}: ${count}`);
+      });
+      console.log('Concepts by Difficulty:');
+      Object.entries(stats.conceptsByDifficulty).forEach(([difficulty, count]) => {
+        console.log(`  ${difficulty}: ${count}`);
+      });
+      console.log(`Total Techniques: ${stats.totalTechniques}`);
+      console.log(`Total Tools: ${stats.totalTools}`);
+    } catch (error) {
+      console.error('❌ Failed to get cybersecurity statistics:', error.message);
+    }
+    process.exit(0);
+  }
+
+  if (args.includes('--cyber-concepts')) {
+    console.log('\n📚 All Cybersecurity Concepts:');
+    try {
+      const concepts = agent.getAllCybersecurityConcepts();
+      concepts.slice(0, 10).forEach((concept, index) => {
+        console.log(`${index + 1}. ${concept.name} (${concept.category})`);
+        console.log(`   ${concept.description}`);
+        console.log(`   Source: ${concept.source}`);
+        console.log('');
+      });
+      if (concepts.length > 10) {
+        console.log(`... and ${concepts.length - 10} more concepts`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to get cybersecurity concepts:', error.message);
+    }
+    process.exit(0);
+  }
+
+  const cyberCategoryIndex = args.indexOf('--cyber-category');
+  if (cyberCategoryIndex !== -1 && args[cyberCategoryIndex + 1]) {
+    const category = args[cyberCategoryIndex + 1];
+    console.log(`\n📚 Cybersecurity Concepts for category: ${category}`);
+    try {
+      const concepts = agent.getCybersecurityConceptsByCategory(category);
+      concepts.slice(0, 10).forEach((concept, index) => {
+        console.log(`${index + 1}. ${concept.name}`);
+        console.log(`   ${concept.description}`);
+        console.log(`   Source: ${concept.source}`);
+        console.log('');
+      });
+      if (concepts.length > 10) {
+        console.log(`... and ${concepts.length - 10} more concepts`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to get cybersecurity concepts by category:', error.message);
     }
     process.exit(0);
   }

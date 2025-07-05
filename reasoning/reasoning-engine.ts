@@ -6,6 +6,7 @@ import { Logger } from '../utils/logger';
 import { AbsoluteZeroReasoner } from './absolute-zero-reasoner';
 import { DarwinGodelEngine } from './darwin-godel-engine';
 import { ReasoningGraph } from './reasoning-graph';
+import { CybersecurityKnowledgeService } from '../services/cybersecurity-knowledge-service';
 
 /**
  * Advanced reasoning engine that combines multiple reasoning strategies
@@ -20,6 +21,7 @@ export class ReasoningEngine {
   private readonly absoluteZeroReasoner: AbsoluteZeroReasoner;
   private readonly reasoningGraph: ReasoningGraph;
   private readonly zeroShotEnabled: boolean;
+  private readonly cybersecurityKnowledgeService: CybersecurityKnowledgeService;
 
   constructor(options: ReasoningEngineOptions) {
     this.client = options.client;
@@ -28,6 +30,7 @@ export class ReasoningEngine {
     this.eventBus = options.eventBus ?? new EventBus();
     this.logger = new Logger('ReasoningEngine');
     this.zeroShotEnabled = options.zeroShotEnabled !== false;
+    this.cybersecurityKnowledgeService = options.cybersecurityKnowledgeService;
 
     // Initialize specialized reasoning components
     this.darwinGodelEngine = new DarwinGodelEngine({
@@ -262,19 +265,26 @@ export class ReasoningEngine {
   }
 
   /**
-   * Execute a reasoning plan
+   * Enhanced reasoning with cybersecurity knowledge integration
    */
   async executeReasoningPlan(
     plan: ReasoningPlan,
     context: any
   ): Promise<ReasoningResult> {
-    this.eventBus.emit('reasoning.execution.start', { plan });
+    this.logger.debug('Executing reasoning plan with cybersecurity knowledge integration');
 
-    if (plan.cached && plan.steps.length === 1 && plan.steps[0].type === 'generation') {
+    // If we have a cached plan, return it
+    if (plan.cached) {
       return this.handleCachedPlan(plan);
     }
 
-    return this.executeSteps(plan, context);
+    // Integrate cybersecurity knowledge into the reasoning process
+    const enhancedContext = await this.enhanceContextWithCybersecurityKnowledge(context);
+
+    // Execute the reasoning steps with enhanced context
+    const result = await this.executeSteps(plan, enhancedContext);
+
+    return result;
   }
 
   /**
@@ -406,23 +416,23 @@ export class ReasoningEngine {
     step: GenerationStep,
     context: any
   ): Promise<string> {
-    // Create a prompt that includes context and memories
-    let prompt = step.input ?? '';
+    let prompt = step.input;
 
-    if (context) {
-      prompt = `Context:\n${JSON.stringify(context)}\n\nQuery: ${prompt}`;
+    // If we have cybersecurity knowledge in context, enhance the prompt
+    if (context.cybersecurityKnowledge) {
+      prompt = this.enhancePromptWithCybersecurityKnowledge(prompt, context.cybersecurityKnowledge);
     }
 
-    if (step.memories && step.memories.length > 0) {
-      prompt += '\n\nRelevant information from memory:';
-      for (const memory of step.memories) {
-        prompt += `\n- ${memory.content}`;
-      }
-    }
+    // Add cybersecurity context to the prompt
+    prompt = this.addCybersecurityContext(prompt, context);
 
-    // Generate content
-    const response = await this.client.generate({ prompt });
-    return response;
+    try {
+      const response = await this.client.generate({ prompt });
+      return response;
+    } catch (error) {
+      this.logger.error('Error in generation step:', error);
+      throw new ReasoningError('Generation failed', error);
+    }
   }
 
   /**
@@ -511,6 +521,168 @@ export class ReasoningEngine {
     // Placeholder for actual validation logic
     return true;
   }
+
+  /**
+   * Enhance context with relevant cybersecurity knowledge
+   */
+  private async enhanceContextWithCybersecurityKnowledge(context: any): Promise<any> {
+    if (!this.cybersecurityKnowledgeService) {
+      return context;
+    }
+
+    try {
+      // Extract key terms from the context for cybersecurity knowledge lookup
+      const keyTerms = this.extractKeyTermsFromContext(context);
+
+      const enhancedContext = { ...context };
+
+      for (const term of keyTerms) {
+        const knowledge = await this.cybersecurityKnowledgeService.queryKnowledge({
+          query: term,
+          maxResults: 3,
+          includeCode: true,
+          includeTechniques: true
+        });
+
+        if (knowledge.concepts.length > 0) {
+          enhancedContext.cybersecurityKnowledge = enhancedContext.cybersecurityKnowledge || {};
+          enhancedContext.cybersecurityKnowledge[term] = knowledge;
+        }
+      }
+
+      return enhancedContext;
+    } catch (error) {
+      this.logger.warn('Failed to enhance context with cybersecurity knowledge:', error);
+      return context;
+    }
+  }
+
+  /**
+   * Extract key terms from context for cybersecurity knowledge lookup
+   */
+  private extractKeyTermsFromContext(context: any): string[] {
+    const terms: string[] = [];
+
+    // Extract terms from various context sources
+    if (context.input) {
+      terms.push(...this.extractTermsFromText(context.input));
+    }
+
+    if (context.memories) {
+      for (const memory of context.memories) {
+        if (memory.content) {
+          terms.push(...this.extractTermsFromText(memory.content));
+        }
+      }
+    }
+
+    // Filter for cybersecurity-related terms
+    const cybersecurityTerms = terms.filter(term =>
+      this.isCybersecurityRelated(term)
+    );
+
+    return [...new Set(cybersecurityTerms)].slice(0, 5); // Limit to top 5 terms
+  }
+
+  /**
+   * Extract terms from text using simple NLP
+   */
+  private extractTermsFromText(text: string): string[] {
+    if (!text || typeof text !== 'string') return [];
+
+    // Simple term extraction - split by common delimiters and filter
+    const words = text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3 && !this.isCommonWord(word));
+
+    return words;
+  }
+
+  /**
+   * Check if a term is cybersecurity-related
+   */
+  private isCybersecurityRelated(term: string): boolean {
+    const cybersecurityKeywords = [
+      'attack', 'defense', 'security', 'vulnerability', 'exploit', 'penetration',
+      'malware', 'virus', 'trojan', 'ransomware', 'phishing', 'social engineering',
+      'network', 'firewall', 'ids', 'ips', 'siem', 'log', 'audit', 'compliance',
+      'encryption', 'cryptography', 'hash', 'password', 'authentication', 'authorization',
+      'nmap', 'metasploit', 'burp', 'wireshark', 'snort', 'suricata', 'yara',
+      'python', 'script', 'shell', 'command', 'terminal', 'linux', 'windows',
+      'web', 'application', 'api', 'database', 'sql', 'injection', 'xss', 'csrf',
+      'cloud', 'aws', 'azure', 'docker', 'kubernetes', 'container', 'virtualization'
+    ];
+
+    return cybersecurityKeywords.some(keyword =>
+      term.includes(keyword) || keyword.includes(term)
+    );
+  }
+
+  /**
+   * Check if a word is a common word that should be filtered out
+   */
+  private isCommonWord(word: string): boolean {
+    const commonWords = [
+      'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+      'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before',
+      'after', 'above', 'below', 'between', 'among', 'within', 'without',
+      'this', 'that', 'these', 'those', 'is', 'are', 'was', 'were', 'be',
+      'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+      'would', 'could', 'should', 'may', 'might', 'can', 'must', 'shall'
+    ];
+
+    return commonWords.includes(word);
+  }
+
+  /**
+   * Enhance prompt with cybersecurity knowledge
+   */
+  private enhancePromptWithCybersecurityKnowledge(prompt: string, knowledge: any): string {
+    let enhancedPrompt = prompt;
+
+    for (const [term, knowledgeData] of Object.entries(knowledge)) {
+      if (knowledgeData.concepts && knowledgeData.concepts.length > 0) {
+        const concept = knowledgeData.concepts[0];
+        enhancedPrompt += `\n\nRelevant cybersecurity knowledge for "${term}":\n`;
+        enhancedPrompt += `- Concept: ${concept.name}\n`;
+        enhancedPrompt += `- Description: ${concept.description}\n`;
+        enhancedPrompt += `- Category: ${concept.category}\n`;
+
+        if (knowledgeData.techniques && knowledgeData.techniques.length > 0) {
+          enhancedPrompt += `- Related techniques: ${knowledgeData.techniques.join(', ')}\n`;
+        }
+
+        if (knowledgeData.tools && knowledgeData.tools.length > 0) {
+          enhancedPrompt += `- Related tools: ${knowledgeData.tools.join(', ')}\n`;
+        }
+
+        if (knowledgeData.codeExamples && knowledgeData.codeExamples.length > 0) {
+          enhancedPrompt += `- Code examples: ${knowledgeData.codeExamples.slice(0, 2).join('\n')}\n`;
+        }
+      }
+    }
+
+    return enhancedPrompt;
+  }
+
+  /**
+   * Add general cybersecurity context to the prompt
+   */
+  private addCybersecurityContext(prompt: string, context: any): string {
+    let enhancedPrompt = prompt;
+
+    enhancedPrompt += `\n\nYou are a cybersecurity AI assistant with access to comprehensive knowledge from cybersecurity books including:
+- Black Hat Python (offensive security techniques)
+- The Hacker Playbook (red team methodologies)
+- Blue Team Handbook (defensive security)
+- RTFm (security tools and techniques)
+
+Use this knowledge to provide accurate, practical cybersecurity guidance. When discussing techniques, tools, or concepts, reference the relevant knowledge from these sources when applicable.`;
+
+    return enhancedPrompt;
+  }
 }
 
 export interface ReasoningEngineOptions {
@@ -519,6 +691,7 @@ export interface ReasoningEngineOptions {
   toolRegistry?: ToolRegistry;
   eventBus?: EventBus;
   zeroShotEnabled?: boolean;
+  cybersecurityKnowledgeService?: CybersecurityKnowledgeService;
 }
 
 export interface ReasoningOptions {

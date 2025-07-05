@@ -21,11 +21,13 @@ import { PluginManager } from './plugins/plugin-manager';
 import { ReasoningEngine } from './reasoning/reasoning-engine';
 import { AuditService } from './services/audit-service';
 import { BookIngestionService } from './services/book-ingestion-service';
+import { CybersecurityKnowledgeService } from './services/cybersecurity-knowledge-service';
 import { HealthMonitoringService } from './services/health-monitoring-service';
 import { LearnModeService } from './services/learn-mode-service';
 import { LogAnalysisService } from './services/log-analysis-service';
 import { ToolRegistry } from './tools/tool-registry';
 import { Logger } from './utils/logger';
+import { CybersecurityKnowledgeService } from './services/cybersecurity-knowledge-service';
 
 /**
  * GemmaAgent - Core autonomous agent with advanced reasoning, learning capabilities,
@@ -48,6 +50,7 @@ export class GemmaAgent {
   private learnModeService: LearnModeService;
   private healthMonitoringService: HealthMonitoringService;
   private bookIngestionService: BookIngestionService;
+  private cybersecurityKnowledgeService: CybersecurityKnowledgeService;
 
   // Workspace integration properties
   private sessionId: string;
@@ -127,6 +130,13 @@ export class GemmaAgent {
 
     this.bookIngestionService = new BookIngestionService(this.memory.getVectorStore());
 
+    // Initialize cybersecurity knowledge service
+    this.cybersecurityKnowledgeService = new CybersecurityKnowledgeService(
+      this.memory,
+      this.client,
+      this.eventBus
+    );
+
     // Initialize health monitoring service after memory is available
     this.healthMonitoringService = new HealthMonitoringService(
       this.eventBus,
@@ -149,7 +159,8 @@ export class GemmaAgent {
       memory: this.memory,
       client: this.client,
       eventBus: this.eventBus,
-      zeroShotEnabled: this.configManager.get('reasoning.zeroShotEnabled', true)
+      zeroShotEnabled: this.configManager.get('reasoning.zeroShotEnabled', true),
+      cybersecurityKnowledgeService: this.cybersecurityKnowledgeService
     });
 
     this.feedbackLoop = new FeedbackLoop({
@@ -195,6 +206,9 @@ export class GemmaAgent {
 
       // Initialize memory systems
       await this.memory.initialize();
+
+      // Initialize cybersecurity knowledge service
+      await this.cybersecurityKnowledgeService.initialize();
 
       // Initialize integrations
       // await Promise.all([
@@ -512,5 +526,47 @@ export class GemmaAgent {
     if (status.overall !== 'healthy') {
       this.logger.info('Manual self-healing triggered due to health issues');
     }
+  }
+
+  /**
+   * Query cybersecurity knowledge for enhanced reasoning
+   */
+  public async queryCybersecurityKnowledge(query: string, options: any = {}): Promise<any> {
+    return await this.cybersecurityKnowledgeService.queryKnowledge({
+      query,
+      category: options.category,
+      difficulty: options.difficulty,
+      maxResults: options.maxResults || 10,
+      includeCode: options.includeCode !== false,
+      includeTechniques: options.includeTechniques !== false
+    });
+  }
+
+  /**
+   * Get cybersecurity concept by ID
+   */
+  public getCybersecurityConcept(id: string): any {
+    return this.cybersecurityKnowledgeService.getConcept(id);
+  }
+
+  /**
+   * Get all cybersecurity concepts
+   */
+  public getAllCybersecurityConcepts(): any[] {
+    return this.cybersecurityKnowledgeService.getAllConcepts();
+  }
+
+  /**
+   * Get cybersecurity concepts by category
+   */
+  public getCybersecurityConceptsByCategory(category: string): any[] {
+    return this.cybersecurityKnowledgeService.getConceptsByCategory(category);
+  }
+
+  /**
+   * Get cybersecurity knowledge statistics
+   */
+  public getCybersecurityKnowledgeStatistics(): any {
+    return this.cybersecurityKnowledgeService.getKnowledgeStatistics();
   }
 }
