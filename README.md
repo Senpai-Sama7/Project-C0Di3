@@ -3,7 +3,7 @@
 </p>
 
 ---
-## **C0DI3** - your computer's personal security
+## He's **"C0DI3"** - your computer's personal security
 ---         
 ![AI-Powered](https://img.shields.io/badge/AI-Powered-blue)
 ![Cyber Defense](https://img.shields.io/badge/Cyber_Defense-Enabled-green)
