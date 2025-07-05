@@ -1,2 +1,5 @@
 .cursor/
 .env
+*.zip
+*.mp4
+node_modules/
