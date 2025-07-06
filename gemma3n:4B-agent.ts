@@ -110,13 +110,13 @@ export class GemmaAgent {
       logToWorkspace: this.chatLogFile ? (data) => this.logToWorkspace('performance', data) : undefined
     });
 
-    // Core AI capabilities - try llama.cpp first, fallback to mock client
+    // Core AI capabilities - require real LLM client
     try {
       this.client = new LlamaCppClient(this.configManager.get('llm.apiUrl', process.env.LLM_API_URL ?? 'http://localhost:8000'));
+      this.logger.info('LLM client initialized successfully');
     } catch (error) {
-      console.log('Falling back to mock LLM client for testing');
-      const { MockLLMClient } = require('./clients/mock-llm-client');
-      this.client = new MockLLMClient();
+      this.logger.error('Failed to initialize LLM client:', error);
+      throw new Error('LLM client is required. Please ensure llama.cpp server is running or configure a valid LLM endpoint.');
     }
 
     // Initialize learn mode service after client is available
