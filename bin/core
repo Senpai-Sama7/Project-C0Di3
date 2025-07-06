@@ -1,0 +1,42 @@
+#!/usr/bin/env node
+
+/**
+ * Core Agent - Natural Language Cybersecurity Assistant
+ * Simple shortcut to launch the CLI with natural language as primary interface
+ */
+
+const { spawn } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Auto-load .gitsensei as env if present
+const gitsenseiPath = path.join(process.cwd(), '.gitsensei');
+if (fs.existsSync(gitsenseiPath)) {
+  dotenv.config({ path: gitsenseiPath });
+}
+
+// Get the directory of this script
+const scriptDir = __dirname;
+const cliPath = path.join(scriptDir, 'cli.js');
+
+// Check if CLI file exists
+if (!fs.existsSync(cliPath)) {
+    console.error('❌ CLI file not found. Please ensure bin/cli.js exists.');
+    process.exit(1);
+}
+
+// Launch the CLI with all arguments passed through
+const child = spawn('node', [cliPath, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+    cwd: process.cwd()
+});
+
+child.on('error', (error) => {
+    console.error('❌ Failed to start Core Agent:', error.message);
+    process.exit(1);
+});
+
+child.on('exit', (code) => {
+    process.exit(code);
+});

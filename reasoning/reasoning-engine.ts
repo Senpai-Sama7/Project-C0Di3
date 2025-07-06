@@ -674,10 +674,10 @@ export class ReasoningEngine {
     let enhancedPrompt = prompt;
 
     enhancedPrompt += `\n\nYou are a cybersecurity AI assistant with access to comprehensive knowledge from cybersecurity books including:
-- Black Hat Python (offensive security techniques)
-- The Hacker Playbook (red team methodologies)
-- Blue Team Handbook (defensive security)
-- RTFm (security tools and techniques)
+- "Black Hat Python" by Justin Seitz & Tim Arnold (offensive security techniques)
+- "The Hacker Playbook 3" by Peter Kim (red team methodologies)
+- "RTFM: Red Team Field Manual v2" by Ben Clark & Nick Downer (security tools and techniques)
+- "Hands-On Ethical Hacking and Network Defense" by Michael Simpson, Nicholas Antill & Robert Wilson (defensive security)
 
 Use this knowledge to provide accurate, practical cybersecurity guidance. When discussing techniques, tools, or concepts, reference the relevant knowledge from these sources when applicable.`;
 

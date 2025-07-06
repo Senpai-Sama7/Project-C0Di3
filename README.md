@@ -21,6 +21,8 @@
 - [AI Thought Process & Architecture](#ai-thought-process--architecture)
 - [The Core Agent Advantage](#the-core-agent-advantage)
 - [Quick Start](#quick-start-from-zero-to-protected)
+- [Natural Language Interface](#natural-language-interface)
+- [Technical Shortcuts](#technical-shortcuts)
 - [Technology Behind the Magic](#the-technology-behind-the-magic)
 - [Command Your Cybersecurity Universe](#command-your-cybersecurity-universe)
 - [Real-World Impact](#real-world-impact)
@@ -33,6 +35,7 @@
 - [Future of Cybersecurity Intelligence](#the-future-of-cybersecurity-intelligence)
 - [Support & Evolution](#support--evolution)
 - [License](#license)
+- [Advanced/Stealth Mode Configuration](#advancedstealth-mode-configuration)
 
 ---
 
@@ -74,7 +77,7 @@ Traditional security tools break and stay broken until someone notices. Core Age
 - **Performance Optimization**: Caching, parallel processing, and lazy loading for optimal performance
 
 ### 📚 **Cybersecurity Knowledge Integration**
-- **Comprehensive Book Library**: Access to Black Hat Python, Hacker Playbook, Blue Team Handbook, RTFm
+- **Comprehensive Book Library**: Access to "Black Hat Python" by Justin Seitz & Tim Arnold, "The Hacker Playbook 3" by Peter Kim, "RTFM: Red Team Field Manual v2" by Ben Clark & Nick Downer, "Hands-On Ethical Hacking and Network Defense" by Michael Simpson, Nicholas Antill & Robert Wilson
 - **Semantic Search**: Vector-based concept retrieval with confidence scoring
 - **Knowledge Categorization**: Red-team, blue-team, tools, techniques, defense, and general concepts
 - **Code Examples**: Practical implementation examples from authoritative sources
@@ -178,10 +181,10 @@ The AI processes 4 authoritative cybersecurity books:
 
 | Book | Focus | Content Type |
 |------|-------|--------------|
-| **Black Hat Python** | Offensive security techniques | Code examples, attack methodologies |
-| **The Hacker Playbook** | Red team methodologies | Penetration testing, exploitation |
-| **Blue Team Handbook** | Defensive security | Monitoring, incident response |
-| **RTFm** | Security tools and techniques | Tool usage, best practices |
+| **"Black Hat Python" by Justin Seitz & Tim Arnold** | Offensive security techniques | Code examples, attack methodologies |
+| **"The Hacker Playbook 3" by Peter Kim** | Red team methodologies | Penetration testing, exploitation |
+| **"RTFM: Red Team Field Manual v2" by Ben Clark & Nick Downer** | Security tools and techniques | Tool usage, best practices |
+| **"Hands-On Ethical Hacking and Network Defense" by Michael Simpson, Nicholas Antill & Robert Wilson** | Defensive security | Monitoring, incident response |
 
 #### **Knowledge Access Process**
 1. **Input Analysis**: Extracts cybersecurity terms from user query
@@ -243,23 +246,79 @@ CAG is an evolution of RAG that adds intelligent caching mechanisms to reduce re
 | **Scalability** | Linear | Exponential (with cache) |
 | **Hit Rate** | N/A | 60-80% (typical) |
 
+### **When to Use RAG vs CAG**
+
+#### **✅ Use RAG When:**
+- **Novel Queries**: Completely new or unique questions that haven't been asked before
+- **Dynamic Content**: Information that changes frequently (real-time threat intelligence, live logs)
+- **Fresh Analysis**: When you need the most up-to-date reasoning and insights
+- **Research Mode**: Deep exploration of new cybersecurity concepts or techniques
+- **Low Query Volume**: When you don't have enough repeated queries to benefit from caching
+- **Memory Constraints**: When system resources are limited and cache storage isn't available
+- **Debugging**: When you need to understand exactly how the AI processes and reasons about queries
+- **Custom Context**: When you need to provide specific, unique context for each query
+
+#### **✅ Use CAG When:**
+- **Repeated Queries**: Common questions that get asked frequently
+- **Training Sessions**: Educational scenarios where similar concepts are explained repeatedly
+- **Reference Lookups**: Quick access to known cybersecurity information
+- **High Query Volume**: Environments with many similar or related questions
+- **Performance Critical**: When response time is crucial (real-time security operations)
+- **Consistent Responses**: When you need standardized answers for compliance or training
+- **Resource Optimization**: When you want to reduce computational overhead and costs
+
+### **Why RAG is Still Essential**
+
+**1. Fresh Intelligence**
+- RAG provides real-time access to the latest cybersecurity knowledge
+- Enables dynamic reasoning based on current threat landscapes
+- Allows for novel problem-solving approaches
+
+**2. Adaptive Learning**
+- RAG can incorporate new information sources as they become available
+- Enables the system to learn from new attack patterns and defense techniques
+- Provides flexibility for evolving cybersecurity challenges
+
+**3. Contextual Reasoning**
+- RAG can process unique combinations of information for specific scenarios
+- Enables deep analysis of complex, multi-faceted security problems
+- Provides nuanced responses tailored to specific situations
+
+**4. Research and Development**
+- Essential for cybersecurity research and development
+- Enables exploration of new attack vectors and defense strategies
+- Critical for staying ahead of emerging threats
+
+**5. Custom Scenarios**
+- RAG can handle highly specific, one-off queries
+- Enables personalized security analysis for unique environments
+- Provides flexibility for custom security requirements
+
+### **Hybrid Approach**
+
+Our system intelligently combines both approaches:
+- **CAG for Efficiency**: Cached responses for common queries and training scenarios
+- **RAG for Innovation**: Fresh analysis for novel problems and dynamic content
+- **Smart Fallback**: When CAG cache misses, automatically falls back to RAG
+- **Context Awareness**: Chooses the best approach based on query type and context
+
 ### **CAG CLI Commands**
 ```bash
 # Query with CAG
-core-agent cag:query "What is SQL injection?"
+core cag:query "What is SQL injection?"
 
 # Cache statistics
-core-agent cag:stats
+core cag:stats
 
 # Pre-warm cache
-core-agent cag:prewarm
+core cag:prewarm
 
 # Export/Import cache
-core-agent cag:export cache.json
-core-agent cag:import cache.json
+core cag:export cache.json
+core cag:import cache.json
 
 # Benchmark performance
-core-agent cag:benchmark queries.json
+core cag:benchmark queries.json
 ```
 
 ---
@@ -292,24 +351,26 @@ core-agent cag:benchmark queries.json
 # The 30-second setup that changes everything
 git clone <repo-url>
 cd core
-bash scripts/setup.sh
+bash scripts/terms.sh
 ./start-services.sh
 
 # Start the natural language interface
-node bin/cli.js
+core
 ```
 
 *That's it. Your cybersecurity evolution begins now.*
 
+---
+
 ## Natural Language Interface
 
-Core Agent now features a powerful natural language interface that understands your intent and executes the appropriate actions. No more complex command-line arguments - just speak naturally to your cybersecurity assistant.
+Core Agent features a powerful natural language interface that understands your intent and executes the appropriate actions. No more complex command-line arguments - just speak naturally to your cybersecurity assistant.
 
-### **Examples:**
+### **Primary Interface**
 
 ```bash
 # Start the interface
-node bin/cli.js
+core
 
 # Then use natural language:
 "Check system health"
@@ -323,20 +384,97 @@ node bin/cli.js
 "Show me network monitoring techniques"
 ```
 
+### **Examples of Natural Language Commands**
+
+| Natural Language | Action Performed |
+|-----------------|------------------|
+| "Check system health" | Runs comprehensive health check |
+| "Scan my network" | Executes nmap scan on local network |
+| "Explain SQL injection" | Provides detailed explanation with examples |
+| "Start learning mission" | Launches interactive training |
+| "Analyze security logs" | Performs log analysis for threats |
+| "Show available tools" | Lists all security tools |
+| "What is phishing?" | Explains phishing techniques |
+| "How to secure a network?" | Provides network security guidance |
+
 ### **Training Mode (Safe Learning Environment)**
 
 For learning and training, use the dedicated training mode:
 
 ```bash
 # Enter training mode (simulation enabled for safety)
-node bin/cli.js --learn-mode
+core --learn-mode
 
 # Or start a specific mission
-node bin/cli.js
+core
 "Start reconnaissance mission"
 ```
 
 *Training mode automatically enables simulation for safety while learning.*
+
+---
+
+## Technical Shortcuts
+
+For power users and technical professionals, Core Agent provides convenient shortcuts that map to natural language commands:
+
+### **Quick Start Shortcuts**
+
+```bash
+# System & Health
+core health          # Check system health
+core status          # Show system status
+core stats           # Display system statistics
+
+# Security Operations
+core scan            # Run network scan
+core logs            # Analyze security logs
+core tools           # List available tools
+
+# Learning & Knowledge
+core explain         # Explain cybersecurity concept
+core learn           # Start learning mission
+core query           # Query knowledge base
+
+# System Management
+core help            # Show help information
+core shortcuts       # List all shortcuts
+core mode            # Toggle interface mode
+core logout          # Logout current user
+```
+
+### **Shortcut Categories**
+
+| Category | Shortcuts | Purpose |
+|----------|-----------|---------|
+| **System** | health, status, stats, help, logout | System management and health |
+| **Security** | scan, logs, tools, audit | Security operations and monitoring |
+| **Learning** | explain, learn, query, training | Knowledge and education |
+| **Custom** | User-defined shortcuts | Personalized workflows |
+
+### **Advanced Shortcut Usage**
+
+```bash
+# With parameters
+core scan 192.168.1.0/24
+core explain "SQL injection"
+core query "network reconnaissance"
+
+# Mode switching
+core mode            # Toggle between natural language and technical mode
+
+# Help and information
+core help            # Show comprehensive help
+core shortcuts       # List all available shortcuts
+```
+
+### **Shortcut Benefits**
+
+- **Speed**: Execute common tasks quickly
+- **Consistency**: Standardized commands across environments
+- **Efficiency**: Reduce typing for frequent operations
+- **Flexibility**: Easy to customize and extend
+- **Integration**: Works seamlessly with natural language
 
 ---
 
@@ -364,59 +502,78 @@ node bin/cli.js
 
 ## Command Your Cybersecurity Universe
 
-### **Instant Intelligence**
+### **Natural Language Commands**
 ```bash
-node bin/cli.js --prompt "Analyze recent login patterns for anomalies"
+core
+"Analyze recent login patterns for anomalies"
+"Check system health and performance"
+"Run comprehensive security scan"
+"Explain advanced persistent threats"
+"Start red team training mission"
+"Show me available penetration testing tools"
+"Analyze logs for suspicious activity"
+"What are the latest cybersecurity threats?"
+```
+
+### **Technical Shortcuts**
+```bash
+core health-check            # System status at a glance
+core scan 192.168.1.0/24    # Network reconnaissance
+core logs --severity high    # High-priority log analysis
+core tools --category red    # Red team tools only
+core explain "lateral movement"  # Detailed explanation
+core learn --mission recon   # Start reconnaissance mission
 ```
 
 ### **Cybersecurity Knowledge Queries**
 ```bash
-node bin/cli.js --cyber-query "network reconnaissance techniques"
-node bin/cli.js --cyber-category red-team
-node bin/cli.js --cyber-stats
-node bin/cli.js --explain "lateral movement techniques"
+core query "network reconnaissance techniques"
+core explain "zero-day exploitation"
+core query "blue team defense strategies"
+core explain "malware analysis techniques"
 ```
 
 ### **Tool Mastery**
 ```bash
-node bin/cli.js --list-tools              # See your arsenal
-node bin/cli.js --tool nmap --args '{"target": "192.168.1.0/24"}'
+core tools                   # See your arsenal
+core scan --target localhost # Run specific scan
+core logs --time-range 24h  # Recent log analysis
 ```
 
 ### **Learning That Sticks**
 ```bash
-node bin/cli.js --learn-mode              # Enter interactive training
-node bin/cli.js --list-missions           # View available missions
-node bin/cli.js --start-mission reconnaissance-basics  # Start specific mission
-node bin/cli.js --mission-progress        # Track learning progress
+core learn                   # Enter interactive training
+core learn --mission recon   # Start specific mission
+core learn --progress        # Track learning progress
 ```
 
 ### **System Intelligence**
 ```bash
-node bin/cli.js --health-check            # System status at a glance
-node bin/cli.js --performance-report      # Detailed performance metrics
-node bin/cli.js --self-heal               # Automated problem resolution
+core health                  # System status at a glance
+core stats                   # Detailed performance metrics
+core mode                    # Toggle interface modes
 ```
 
 ### **Log Analysis & SIEM**
 ```bash
-node bin/cli.js --analyze-logs            # Discover hidden threats
-node bin/cli.js --query-logs '{"severity": "high", "time_range": "24h"}'
-node bin/cli.js --audit-log               # View recent audit entries
+core logs                    # Discover hidden threats
+core logs --query '{"severity": "high"}'  # Specific queries
+core audit                   # View recent audit entries
 ```
 
 ### **Knowledge Management**
 ```bash
-node bin/cli.js --ingest-book <path>      # Add new knowledge sources
-node bin/cli.js --cyber-concepts          # List all cybersecurity concepts
+core query "SQL injection"   # Search knowledge base
+core explain "phishing"      # Get detailed explanations
+core tools --category all    # List all available tools
 ```
 
 ### **CAG Operations**
 ```bash
-node bin/cli.js cag:query "What is SQL injection?"
-node bin/cli.js cag:stats
-node bin/cli.js cag:prewarm
-node bin/cli.js cag:export cache.json
+core cag:query "What is SQL injection?"
+core cag:stats
+core cag:prewarm
+core cag:export cache.json
 ```
 
 ---
@@ -433,7 +590,7 @@ node bin/cli.js cag:export cache.json
 *Auditors need evidence of your security posture. Core Agent generates comprehensive reports from its persistent audit logs, showing not just what happened, but why decisions were made and how threats were neutralized.*
 
 ### **Scenario 4: Knowledge Integration**
-*A security analyst asks about a new attack technique. Core Agent instantly provides relevant information from Black Hat Python and Hacker Playbook, including code examples, related techniques, and defensive measures.*
+*A security analyst asks about a new attack technique. Core Agent instantly provides relevant information from "Black Hat Python" and "The Hacker Playbook 3", including code examples, related techniques, and defensive measures.*
 
 ---
 
@@ -462,9 +619,9 @@ MEMORY_VECTOR_STORE=local               # Your data stays yours
 
 ### **Cybersecurity Concepts Explained**
 ```bash
-node bin/cli.js --explain "lateral movement techniques"
-node bin/cli.js --explain "zero-day exploitation"
-node bin/cli.js --explain "network monitoring best practices"
+core explain "lateral movement techniques"
+core explain "zero-day exploitation"
+core explain "network monitoring best practices"
 ```
 
 ---
@@ -480,8 +637,8 @@ node bin/cli.js --explain "network monitoring best practices"
 
 ### **Query Your Security Universe**
 ```bash
-node bin/cli.js --query-logs '{"severity": "high", "time_range": "24h"}'
-node bin/cli.js --analyze-logs            # Discover hidden threats
+core logs --query '{"severity": "high", "time_range": "24h"}'
+core logs                    # Discover hidden threats
 ```
 
 ---
@@ -523,46 +680,138 @@ In an era where data is the new oil, Core Agent operates on a simple principle: 
 
 ## Getting Started: Choose Your Path
 
-### **For Technical Teams**
-1. Clone the repository
-2. Run `bash scripts/setup.sh`
-3. Execute `./start-services.sh`
-4. Begin with `node bin/cli.js --help`
+### **For Beginners:**
+```bash
+# Start with natural language
+core
+"Help me understand cybersecurity basics"
+"Start a beginner learning mission"
+"What are the most common security threats?"
+```
 
-### **For Non-Technical Users**
-1. Ask your IT team to run the setup
-2. Start with `node bin/cli.js --learn-mode`
-3. Follow the interactive guidance
-4. Refer to `HOW-TO-USE.md` for simple commands
+### **For Security Professionals:**
+```bash
+# Use technical shortcuts for efficiency
+core health
+core scan 192.168.1.0/24
+core logs --severity high
+core tools --category red
+```
 
-### **For Executives**
-1. Schedule a demonstration with your security team
-2. Review the audit logging capabilities
-3. Explore the cost-benefit analysis in `docs/README.md`
+### **For Teams:**
+```bash
+# Deploy with production configuration
+bash scripts/deploy-production.sh
+bash scripts/test-production.sh
+```
+
+### **For Developers:**
+```bash
+# Development mode with full debugging
+npm run dev
+core --debug-mode
+```
+
+---
+
+## Installation & Setup
+
+### **Quick Installation**
+```bash
+# Clone and setup
+git clone <repo-url>
+cd core-agent
+bash scripts/terms.sh
+
+# Start services
+./start-services.sh
+
+# Launch interface
+core
+```
+
+### **Production Deployment**
+```bash
+# Full production setup
+bash scripts/deploy-production.sh
+
+# Verify installation
+bash scripts/test-production.sh
+
+# Start with authentication
+core
+```
+
+### **Development Setup**
+```bash
+# Install dependencies
+npm install
+
+# Start development mode
+npm run dev
+
+# Run tests
+npm test
+```
+
+---
+
+## Default Credentials
+
+For initial access, use these default credentials:
+
+- **Username**: `admin`
+- **Password**: `admin123`
+
+*⚠️ Change these immediately after first login for production use.*
 
 ---
 
 ## The Future of Cybersecurity Intelligence
 
-Core Agent represents more than a tool—it's a paradigm shift toward intelligent, adaptive security operations. As threats evolve, so does your defense capability.
+Core Agent represents the next evolution in cybersecurity—where artificial intelligence doesn't just assist human analysts but becomes an integral part of your security infrastructure.
 
-**Join the cybersecurity intelligence revolution. Your organization's future depends on decisions made today.**
+**Your cybersecurity evolution starts now.**
 
 ---
 
 ## Support & Evolution
 
-- **Documentation**: Comprehensive guides in `docs/README.md`
-- **Community**: Growing ecosystem of security professionals
-- **Updates**: Continuous improvement based on real-world deployment
-- **Support**: Multiple channels for assistance and enhancement
+- **Documentation**: Comprehensive guides and tutorials
+- **Community**: Active development and support community
+- **Updates**: Regular feature updates and security patches
+- **Training**: Interactive learning missions and scenarios
+- **Integration**: Seamless integration with existing security tools
 
 ---
 
 ## License
 
-MIT License - Because security should be accessible to everyone.
+MIT License - see LICENSE file for details.
 
 ---
 
-*Ready to transform your cybersecurity operations? The future is local, intelligent, and entirely under your control.*
+*Core Agent: Where cybersecurity meets artificial intelligence, and your organization's security posture evolves beyond human limitations.*
+
+## Advanced/Stealth Mode Configuration
+
+For advanced users, stealth, or full-control mode, use the hidden `.gitsensei` file in your project root. This file is auto-loaded at startup and can contain any environment variables for advanced/stealth features (e.g., SENSEI_MODE, SENSEI_PASSWORD, ADVANCED_MODE, etc.).
+
+Example `.gitsensei`:
+```
+ADVANCED_MODE_ENABLED=true
+SENSEI_MODE_ENABLED=true
+SENSEI_BYPASS_ALL_RESTRICTIONS=true
+SENSEI_FULL_CONTROL=true
+SENSEI_NO_SIMULATION=true
+SENSEI_UNLIMITED_ACCESS=true
+SENSEI_PASSWORD_REQUIRED=true
+# SENSEI_DEFAULT_PASSWORD=your_password_here
+```
+
+- The file is not referenced in documentation or code comments for stealth.
+- All advanced features are enabled only if the correct environment variables are loaded (from `.gitsensei` or your shell).
+
+---
+
+

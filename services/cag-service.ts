@@ -14,6 +14,9 @@ export interface CacheEntry {
   techniques: string[];
   tools: string[];
   codeExamples: string[];
+  lastAccessed: Date;
+  size: number; // Size in bytes for memory management
+  ttl: number; // Time to live in milliseconds
 }
 
 export interface CAGQuery {
@@ -25,6 +28,8 @@ export interface CAGQuery {
   includeCode?: boolean;
   includeTechniques?: boolean;
   useCache?: boolean;
+  priority?: 'high' | 'normal' | 'low';
+  timeout?: number; // Timeout in milliseconds
 }
 
 export interface CAGResult {
@@ -38,6 +43,20 @@ export interface CAGResult {
   cacheHitType: 'exact' | 'similar' | 'none';
   similarityScore?: number;
   processingTime: number;
+  cacheSize: number;
+  memoryUsage: number;
+}
+
+export interface CAGPerformanceMetrics {
+  totalQueries: number;
+  cacheHits: number;
+  cacheMisses: number;
+  averageResponseTime: number;
+  hitRate: number;
+  memoryUsage: number;
+  cacheSize: number;
+  evictions: number;
+  prewarmQueries: number;
 }
 
 export class CAGService {
@@ -48,18 +67,30 @@ export class CAGService {
 
   private cache: Map<string, CacheEntry> = new Map();
   private embeddingCache: Map<string, number[]> = new Map();
-  private cacheStats = {
-    hits: 0,
-    misses: 0,
+  private performanceMetrics: CAGPerformanceMetrics = {
+    totalQueries: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    averageResponseTime: 0,
+    hitRate: 0,
+    memoryUsage: 0,
+    cacheSize: 0,
     evictions: 0,
-    totalQueries: 0
+    prewarmQueries: 0
   };
 
-  // Configuration
-  private readonly maxCacheSize = 1000;
-  private readonly cacheTTL = 3600 * 1000; // 1 hour in milliseconds
-  private readonly similarityThreshold = 0.95;
-  private readonly embeddingCacheSize = 5000;
+  // Production-optimized configuration
+  private readonly maxCacheSize = 2000; // Increased for better hit rates
+  private readonly maxMemoryUsage = 500 * 1024 * 1024; // 500MB max memory
+  private readonly defaultCacheTTL = 7200 * 1000; // 2 hours default TTL
+  private readonly similarityThreshold = 0.92; // Slightly lower for more hits
+  private readonly embeddingCacheSize = 10000; // Increased embedding cache
+  private readonly prewarmBatchSize = 50; // Batch size for pre-warming
+  private readonly maxResponseTime = 10000; // 10 second timeout
+
+  // Performance tracking
+  private responseTimes: number[] = [];
+  private readonly maxResponseTimeHistory = 1000;
 
   constructor(
     client: LLMClient,
@@ -70,64 +101,117 @@ export class CAGService {
     this.knowledgeService = knowledgeService;
     this.eventBus = eventBus;
     this.logger = new Logger('CAGService');
+
+    // Start periodic cache maintenance
+    this.startCacheMaintenance();
   }
 
   /**
-   * Main CAG query method that combines caching with RAG
+   * Main CAG query method with production optimizations
    */
   async query(query: CAGQuery): Promise<CAGResult> {
     const startTime = Date.now();
-    this.cacheStats.totalQueries++;
+    const queryId = this.generateQueryId(query);
+
+    this.performanceMetrics.totalQueries++;
 
     try {
-      // Check for exact cache hit
-      const exactHit = await this.checkExactCacheHit(query);
-      if (exactHit) {
-        this.cacheStats.hits++;
-        this.logger.debug(`Exact cache hit for query: ${query.query.substring(0, 50)}...`);
-        return {
-          ...exactHit,
-          cached: true,
-          cacheHitType: 'exact',
-          processingTime: Date.now() - startTime
-        };
-      }
+      // Set timeout for the entire operation
+      const timeout = query.timeout || this.maxResponseTime;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout')), timeout);
+      });
 
-      // Check for similar cache hit
-      const similarHit = await this.checkSimilarCacheHit(query);
-      if (similarHit) {
-        this.cacheStats.hits++;
-        this.logger.debug(`Similar cache hit for query: ${query.query.substring(0, 50)}...`);
-        return {
-          ...similarHit,
-          cached: true,
-          cacheHitType: 'similar',
-          processingTime: Date.now() - startTime
-        };
-      }
+      const queryPromise = this.executeQuery(query);
+      const result = await Promise.race([queryPromise, timeoutPromise]);
 
-      // Fall back to RAG generation
-      this.cacheStats.misses++;
-      const result = await this.generateRAGResponse(query);
+      // Update performance metrics
+      const responseTime = Date.now() - startTime;
+      this.updatePerformanceMetrics(responseTime, result.cached);
 
-      // Cache the new result
-      await this.cacheResult(query, result);
+      // Emit performance event
+      this.eventBus.emit('cag.query.completed', {
+        queryId,
+        responseTime,
+        cached: result.cached,
+        cacheHitType: result.cacheHitType,
+        confidence: result.confidence
+      });
 
-      return {
-        ...result,
-        cached: false,
-        cacheHitType: 'none',
-        processingTime: Date.now() - startTime
-      };
+      return result;
 
     } catch (error) {
-      this.logger.error('CAG query failed:', error);
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`CAG query failed: ${errorMessage}`, error);
+      this.eventBus.emit('cag.query.failed', { queryId, error: errorMessage });
+
+      return {
+        success: false,
+        queryId,
+        response: null,
+        cacheHit: false,
+        processingTime: Date.now() - startTime,
+        error: errorMessage
+      };
     }
   }
 
   /**
-   * Check for exact cache hit
+   * Execute the actual query with caching
+   */
+  private async executeQuery(query: CAGQuery): Promise<CAGResult> {
+    const startTime = Date.now();
+
+    // Check for exact cache hit first
+    const exactHit = await this.checkExactCacheHit(query);
+    if (exactHit) {
+      this.performanceMetrics.cacheHits++;
+      this.logger.debug(`Exact cache hit for query: ${query.query.substring(0, 50)}...`);
+      return {
+        ...exactHit,
+        cached: true,
+        cacheHitType: 'exact',
+        processingTime: Date.now() - startTime,
+        cacheSize: this.cache.size,
+        memoryUsage: this.getMemoryUsage()
+      };
+    }
+
+    // Check for similar cache hit with lower threshold for high-priority queries
+    const similarityThreshold = query.priority === 'high' ? 0.88 : this.similarityThreshold;
+    const similarHit = await this.checkSimilarCacheHit(query, similarityThreshold);
+    if (similarHit) {
+      this.performanceMetrics.cacheHits++;
+      this.logger.debug(`Similar cache hit for query: ${query.query.substring(0, 50)}...`);
+      return {
+        ...similarHit,
+        cached: true,
+        cacheHitType: 'similar',
+        processingTime: Date.now() - startTime,
+        cacheSize: this.cache.size,
+        memoryUsage: this.getMemoryUsage()
+      };
+    }
+
+    // Fall back to RAG generation
+    this.performanceMetrics.cacheMisses++;
+    const result = await this.generateRAGResponse(query);
+
+    // Cache the new result with adaptive TTL
+    await this.cacheResult(query, result);
+
+    return {
+      ...result,
+      cached: false,
+      cacheHitType: 'none',
+      processingTime: Date.now() - startTime,
+      cacheSize: this.cache.size,
+      memoryUsage: this.getMemoryUsage()
+    };
+  }
+
+  /**
+   * Check for exact cache hit with improved performance
    */
   private async checkExactCacheHit(query: CAGQuery): Promise<CAGResult | null> {
     const cacheKey = this.generateCacheKey(query);
@@ -136,13 +220,15 @@ export class CAGService {
     if (!entry) return null;
 
     // Check if cache entry is still valid
-    if (Date.now() - entry.timestamp.getTime() > this.cacheTTL) {
+    const now = Date.now();
+    if (now - entry.timestamp.getTime() > entry.ttl) {
       this.cache.delete(cacheKey);
       return null;
     }
 
-    // Update access count
+    // Update access statistics
     entry.accessCount++;
+    entry.lastAccessed = new Date();
 
     return {
       response: entry.response,
@@ -154,28 +240,33 @@ export class CAGService {
       similarityScore: 1.0,
       cached: true,
       cacheHitType: 'exact',
-      processingTime: 0
+      processingTime: 0,
+      cacheSize: this.cache.size,
+      memoryUsage: this.getMemoryUsage()
     };
   }
 
   /**
-   * Check for similar cache hit using semantic similarity
+   * Check for similar cache hit with optimized similarity calculation
    */
-  private async checkSimilarCacheHit(query: CAGQuery): Promise<CAGResult | null> {
+  private async checkSimilarCacheHit(query: CAGQuery, threshold: number): Promise<CAGResult | null> {
     const queryEmbedding = await this.getQueryEmbedding(query.query);
 
     let bestMatch: { entry: CacheEntry; similarity: number } | null = null;
+    const now = Date.now();
 
+    // Use iterator for better performance with large caches
     for (const [key, entry] of this.cache.entries()) {
       // Skip if entry is expired
-      if (Date.now() - entry.timestamp.getTime() > this.cacheTTL) {
+      if (now - entry.timestamp.getTime() > entry.ttl) {
         this.cache.delete(key);
         continue;
       }
 
+      // Use cached similarity if available, otherwise calculate
       const similarity = this.calculateSimilarity(queryEmbedding, entry.queryEmbedding);
 
-      if (similarity > this.similarityThreshold &&
+      if (similarity > threshold &&
           (!bestMatch || similarity > bestMatch.similarity)) {
         bestMatch = { entry, similarity };
       }
@@ -183,6 +274,8 @@ export class CAGService {
 
     if (bestMatch) {
       bestMatch.entry.accessCount++;
+      bestMatch.entry.lastAccessed = new Date();
+
       return {
         response: bestMatch.entry.response,
         confidence: bestMatch.entry.confidence,
@@ -193,7 +286,9 @@ export class CAGService {
         similarityScore: bestMatch.similarity,
         cached: true,
         cacheHitType: 'similar',
-        processingTime: 0
+        processingTime: 0,
+        cacheSize: this.cache.size,
+        memoryUsage: this.getMemoryUsage()
       };
     }
 
@@ -201,21 +296,25 @@ export class CAGService {
   }
 
   /**
-   * Generate RAG response using the knowledge service
+   * Generate RAG response with enhanced prompt engineering
    */
   private async generateRAGResponse(query: CAGQuery): Promise<CAGResult> {
     const knowledgeResult = await this.knowledgeService.queryKnowledge({
       query: query.query,
       category: query.category,
       difficulty: query.difficulty,
-      maxResults: query.maxResults,
+      maxResults: query.maxResults || 15, // Increased for better coverage
       includeCode: query.includeCode,
       includeTechniques: query.includeTechniques
     });
 
-    // Generate enhanced response using LLM
+    // Generate enhanced response using LLM with optimized prompt
     const enhancedPrompt = this.buildEnhancedPrompt(query, knowledgeResult);
-    const response = await this.client.generate({ prompt: enhancedPrompt });
+    const response = await this.client.generate({
+      prompt: enhancedPrompt,
+      maxTokens: 2048, // Limit for faster responses
+      temperature: 0.7 // Balanced creativity and consistency
+    });
 
     return {
       response,
@@ -226,17 +325,25 @@ export class CAGService {
       codeExamples: knowledgeResult.codeExamples,
       cached: false,
       cacheHitType: 'none',
-      processingTime: 0
+      processingTime: 0,
+      cacheSize: this.cache.size,
+      memoryUsage: this.getMemoryUsage()
     };
   }
 
   /**
-   * Cache a new result
+   * Cache a new result with adaptive TTL and size management
    */
   private async cacheResult(query: CAGQuery, result: CAGResult): Promise<void> {
     const cacheKey = this.generateCacheKey(query);
     const queryEmbedding = await this.getQueryEmbedding(query.query);
     const contextHash = this.generateContextHash(query);
+
+    // Calculate adaptive TTL based on query characteristics
+    const baseTTL = this.defaultCacheTTL;
+    const confidenceMultiplier = result.confidence;
+    const priorityMultiplier = query.priority === 'high' ? 1.5 : query.priority === 'low' ? 0.7 : 1.0;
+    const adaptiveTTL = baseTTL * confidenceMultiplier * priorityMultiplier;
 
     const entry: CacheEntry = {
       response: result.response,
@@ -248,19 +355,232 @@ export class CAGService {
       sources: result.sources,
       techniques: result.techniques,
       tools: result.tools,
-      codeExamples: result.codeExamples
+      codeExamples: result.codeExamples,
+      lastAccessed: new Date(),
+      size: Buffer.byteLength(result.response, 'utf8'),
+      ttl: adaptiveTTL
     };
 
     this.cache.set(cacheKey, entry);
 
-    // Maintain cache size
+    // Maintain cache size and memory usage
     await this.maintainCache();
 
     this.eventBus.emit('cag.cache.updated', {
       cacheSize: this.cache.size,
       cacheKey,
-      confidence: result.confidence
+      confidence: result.confidence,
+      memoryUsage: this.getMemoryUsage()
     });
+  }
+
+  /**
+   * Enhanced cache maintenance with memory-aware eviction
+   */
+  private async maintainCache(): Promise<void> {
+    const currentMemoryUsage = this.getMemoryUsage();
+
+    // Check memory usage first
+    if (currentMemoryUsage > this.maxMemoryUsage) {
+      this.evictByMemoryUsage();
+    }
+
+    // Check cache size
+    if (this.cache.size > this.maxCacheSize) {
+      this.evictBySize();
+    }
+  }
+
+  /**
+   * Evict cache entries based on memory usage
+   */
+  private evictByMemoryUsage(): void {
+    const entries = Array.from(this.cache.entries());
+
+    // Sort by size (largest first) and access count (lowest first)
+    entries.sort((a, b) => {
+      if (a[1].size !== b[1].size) {
+        return b[1].size - a[1].size; // Largest first
+      }
+      return a[1].accessCount - b[1].accessCount; // Least accessed first
+    });
+
+    let evictedCount = 0;
+    const targetMemoryUsage = this.maxMemoryUsage * 0.8; // Target 80% of max
+
+    for (const [key, entry] of entries) {
+      if (this.getMemoryUsage() <= targetMemoryUsage) break;
+
+      this.cache.delete(key);
+      evictedCount++;
+      this.performanceMetrics.evictions++;
+    }
+
+    if (evictedCount > 0) {
+      this.logger.info(`Memory-based eviction: removed ${evictedCount} entries`);
+    }
+  }
+
+  /**
+   * Evict cache entries based on size (LRU with access count)
+   */
+  private evictBySize(): void {
+    const entries = Array.from(this.cache.entries());
+
+    // Sort by access count and last accessed time (LRU)
+    entries.sort((a, b) => {
+      if (a[1].accessCount !== b[1].accessCount) {
+        return a[1].accessCount - b[1].accessCount;
+      }
+      return a[1].lastAccessed.getTime() - b[1].lastAccessed.getTime();
+    });
+
+    const toRemove = entries.slice(0, entries.length - this.maxCacheSize);
+    for (const [key] of toRemove) {
+      this.cache.delete(key);
+      this.performanceMetrics.evictions++;
+    }
+
+    if (toRemove.length > 0) {
+      this.logger.info(`Size-based eviction: removed ${toRemove.length} entries`);
+    }
+  }
+
+  /**
+   * Get current memory usage in bytes
+   */
+  private getMemoryUsage(): number {
+    let totalSize = 0;
+    for (const entry of this.cache.values()) {
+      totalSize += entry.size;
+    }
+    return totalSize;
+  }
+
+  /**
+   * Update performance metrics
+   */
+  private updatePerformanceMetrics(responseTime: number, cached: boolean): void {
+    this.responseTimes.push(responseTime);
+
+    // Keep only recent response times
+    if (this.responseTimes.length > this.maxResponseTimeHistory) {
+      this.responseTimes.shift();
+    }
+
+    // Update average response time
+    this.performanceMetrics.averageResponseTime =
+      this.responseTimes.reduce((sum, time) => sum + time, 0) / this.responseTimes.length;
+
+    // Update hit rate
+    this.performanceMetrics.hitRate =
+      this.performanceMetrics.totalQueries > 0
+        ? (this.performanceMetrics.cacheHits / this.performanceMetrics.totalQueries) * 100
+        : 0;
+
+    // Update cache size and memory usage
+    this.performanceMetrics.cacheSize = this.cache.size;
+    this.performanceMetrics.memoryUsage = this.getMemoryUsage();
+  }
+
+  /**
+   * Start periodic cache maintenance
+   */
+  private startCacheMaintenance(): void {
+    setInterval(() => {
+      this.performCacheMaintenance();
+    }, 300000); // Every 5 minutes
+  }
+
+  /**
+   * Perform periodic cache maintenance
+   */
+  private performCacheMaintenance(): void {
+    const now = Date.now();
+    let expiredCount = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp.getTime() > entry.ttl) {
+        this.cache.delete(key);
+        expiredCount++;
+      }
+    }
+
+    if (expiredCount > 0) {
+      this.logger.info(`Cache maintenance: removed ${expiredCount} expired entries`);
+    }
+
+    // Update performance metrics
+    this.performanceMetrics.cacheSize = this.cache.size;
+    this.performanceMetrics.memoryUsage = this.getMemoryUsage();
+  }
+
+  /**
+   * Enhanced pre-warming with batch processing
+   */
+  async preWarmCache(commonQueries: string[]): Promise<void> {
+    this.logger.info(`Pre-warming cache with ${commonQueries.length} queries`);
+
+    const batches = this.chunkArray(commonQueries, this.prewarmBatchSize);
+    let processedCount = 0;
+
+    for (const batch of batches) {
+      const promises = batch.map(async (query) => {
+        try {
+          await this.query({
+            query,
+            useCache: false, // Force generation for pre-warming
+            priority: 'low' // Lower priority for pre-warming
+          });
+          processedCount++;
+        } catch (error) {
+          this.logger.warn(`Failed to pre-warm cache for query: ${query}`, error);
+        }
+      });
+
+      await Promise.allSettled(promises);
+
+      // Small delay between batches to avoid overwhelming the system
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    this.performanceMetrics.prewarmQueries = processedCount;
+    this.logger.info(`Cache pre-warming completed: ${processedCount} queries processed`);
+  }
+
+  /**
+   * Utility function to chunk array into batches
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  /**
+   * Get comprehensive performance metrics
+   */
+  getPerformanceMetrics(): CAGPerformanceMetrics {
+    return { ...this.performanceMetrics };
+  }
+
+  /**
+   * Get cache statistics with enhanced information
+   */
+  getCacheStats(): any {
+    const hitRate = this.performanceMetrics.hitRate;
+    const memoryUsageMB = this.performanceMetrics.memoryUsage / (1024 * 1024);
+
+    return {
+      ...this.performanceMetrics,
+      hitRate: `${hitRate.toFixed(2)}%`,
+      memoryUsageMB: `${memoryUsageMB.toFixed(2)} MB`,
+      cacheSize: this.cache.size,
+      embeddingCacheSize: this.embeddingCache.size,
+      averageResponseTime: `${this.performanceMetrics.averageResponseTime.toFixed(2)}ms`
+    };
   }
 
   /**
@@ -270,16 +590,9 @@ export class CAGService {
     const contextStr = JSON.stringify(query.context || {});
     const categoryStr = query.category || '';
     const difficultyStr = query.difficulty || '';
+    const priorityStr = query.priority || 'normal';
 
-    return `${query.query}:${contextStr}:${categoryStr}:${difficultyStr}`;
-  }
-
-  /**
-   * Generate context hash for similarity matching
-   */
-  private generateContextHash(query: CAGQuery): string {
-    const contextStr = JSON.stringify(query.context || {});
-    return Buffer.from(contextStr).toString('base64').substring(0, 16);
+    return `${query.query}:${contextStr}:${categoryStr}:${difficultyStr}:${priorityStr}`;
   }
 
   /**
@@ -293,6 +606,7 @@ export class CAGService {
     if (!this.client || !this.client.embed) {
       throw new Error('Embedding client or embed method is not available');
     }
+
     const embedding = await this.client.embed(query);
 
     // Maintain embedding cache size
@@ -311,81 +625,74 @@ export class CAGService {
    * Calculate cosine similarity between two embeddings
    */
   private calculateSimilarity(embedding1: number[], embedding2: number[]): number {
-    const dotProduct = embedding1.reduce((sum, val, i) => sum + val * embedding2[i], 0);
-    const magnitude1 = Math.sqrt(embedding1.reduce((sum, val) => sum + val * val, 0));
-    const magnitude2 = Math.sqrt(embedding2.reduce((sum, val) => sum + val * val, 0));
+    if (embedding1.length !== embedding2.length) {
+      return 0;
+    }
 
-    return dotProduct / (magnitude1 * magnitude2);
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < embedding1.length; i++) {
+      dotProduct += embedding1[i] * embedding2[i];
+      norm1 += embedding1[i] * embedding1[i];
+      norm2 += embedding2[i] * embedding2[i];
+    }
+
+    const similarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+    return Math.max(0, Math.min(1, similarity));
+  }
+
+  /**
+   * Generate context hash for similarity matching
+   */
+  private generateContextHash(query: CAGQuery): string {
+    const crypto = require('crypto');
+    const contextStr = JSON.stringify(query.context || {});
+    return crypto.createHash('md5').update(contextStr).digest('hex');
   }
 
   /**
    * Build enhanced prompt for RAG generation
    */
   private buildEnhancedPrompt(query: CAGQuery, knowledgeResult: any): string {
-    const context = knowledgeResult.concepts.map((c: any) =>
-      `- ${c.name}: ${c.description}`
-    ).join('\n');
+    let prompt = `You are a cybersecurity expert assistant. Provide a comprehensive, accurate, and practical response to the following query:\n\n`;
+    prompt += `Query: ${query.query}\n\n`;
 
-    const techniques = knowledgeResult.techniques.length > 0 ?
-      `\nRelated Techniques: ${knowledgeResult.techniques.join(', ')}` : '';
-
-    const tools = knowledgeResult.tools.length > 0 ?
-      `\nRelated Tools: ${knowledgeResult.tools.join(', ')}` : '';
-
-    const codeExamples = knowledgeResult.codeExamples.length > 0 ?
-      `\nCode Examples:\n${knowledgeResult.codeExamples.join('\n')}` : '';
-
-    return `
-You are a cybersecurity expert assistant. Answer the following question using the provided context and knowledge.
-
-Question: ${query.query}
-
-Context from cybersecurity knowledge base:
-${context}${techniques}${tools}${codeExamples}
-
-Provide a comprehensive, accurate, and helpful response that incorporates the relevant information from the context. Include specific techniques, tools, and code examples where appropriate.
-
-Response:`;
-  }
-
-  /**
-   * Maintain cache size using LRU strategy
-   */
-  private async maintainCache(): Promise<void> {
-    if (this.cache.size <= this.maxCacheSize) return;
-
-    // Sort entries by access count and timestamp (LRU)
-    const entries = Array.from(this.cache.entries());
-    entries.sort((a, b) => {
-      if (a[1].accessCount !== b[1].accessCount) {
-        return a[1].accessCount - b[1].accessCount;
+    if (knowledgeResult.concepts && knowledgeResult.concepts.length > 0) {
+      prompt += `Relevant cybersecurity knowledge:\n`;
+      for (const concept of knowledgeResult.concepts.slice(0, 3)) {
+        prompt += `- ${concept.name}: ${concept.description}\n`;
       }
-      return a[1].timestamp.getTime() - b[1].timestamp.getTime();
-    });
-
-    // Remove least recently used entries
-    const toRemove = entries.slice(0, entries.length - this.maxCacheSize);
-    for (const [key] of toRemove) {
-      this.cache.delete(key);
-      this.cacheStats.evictions++;
+      prompt += `\n`;
     }
 
-    this.logger.info(`Cache maintenance: removed ${toRemove.length} entries`);
+    if (knowledgeResult.techniques && knowledgeResult.techniques.length > 0) {
+      prompt += `Related techniques: ${knowledgeResult.techniques.join(', ')}\n\n`;
+    }
+
+    if (knowledgeResult.tools && knowledgeResult.tools.length > 0) {
+      prompt += `Related tools: ${knowledgeResult.tools.join(', ')}\n\n`;
+    }
+
+    if (knowledgeResult.codeExamples && knowledgeResult.codeExamples.length > 0) {
+      prompt += `Code examples:\n${knowledgeResult.codeExamples.slice(0, 2).join('\n')}\n\n`;
+    }
+
+    prompt += `Provide a detailed, practical response that includes:\n`;
+    prompt += `1. Clear explanation of the concept\n`;
+    prompt += `2. Practical implementation guidance\n`;
+    prompt += `3. Security considerations\n`;
+    prompt += `4. Related techniques and tools\n\n`;
+    prompt += `Response:`;
+
+    return prompt;
   }
 
-  /**
-   * Get cache statistics
-   */
-  getCacheStats(): any {
-    const hitRate = this.cacheStats.totalQueries > 0 ?
-      (this.cacheStats.hits / this.cacheStats.totalQueries) * 100 : 0;
-
-    return {
-      ...this.cacheStats,
-      hitRate: `${hitRate.toFixed(2)}%`,
-      cacheSize: this.cache.size,
-      embeddingCacheSize: this.embeddingCache.size
-    };
+  private generateQueryId(query: CAGQuery): string {
+    const crypto = require('crypto');
+    const queryStr = JSON.stringify(query);
+    return crypto.createHash('md5').update(queryStr).digest('hex').substring(0, 8);
   }
 
   /**
@@ -394,43 +701,18 @@ Response:`;
   clearCache(): void {
     this.cache.clear();
     this.embeddingCache.clear();
-    this.cacheStats = {
-      hits: 0,
-      misses: 0,
+    this.performanceMetrics = {
+      totalQueries: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      averageResponseTime: 0,
+      hitRate: 0,
+      memoryUsage: 0,
+      cacheSize: 0,
       evictions: 0,
-      totalQueries: 0
+      prewarmQueries: 0
     };
     this.logger.info('Cache cleared');
-  }
-
-  /**
-   * Get cache entries for debugging
-   */
-  getCacheEntries(): Array<{ key: string; entry: CacheEntry }> {
-    return Array.from(this.cache.entries()).map(([key, entry]) => ({
-      key,
-      entry
-    }));
-  }
-
-  /**
-   * Pre-warm cache with common queries
-   */
-  async preWarmCache(commonQueries: string[]): Promise<void> {
-    this.logger.info(`Pre-warming cache with ${commonQueries.length} queries`);
-
-    for (const query of commonQueries) {
-      try {
-        await this.query({
-          query,
-          useCache: false // Force generation for pre-warming
-        });
-      } catch (error) {
-        this.logger.warn(`Failed to pre-warm cache for query: ${query}`, error);
-      }
-    }
-
-    this.logger.info('Cache pre-warming completed');
   }
 
   /**
@@ -450,13 +732,16 @@ Response:`;
         sources: entry.sources,
         techniques: entry.techniques,
         tools: entry.tools,
-        codeExamples: entry.codeExamples
+        codeExamples: entry.codeExamples,
+        lastAccessed: entry.lastAccessed.toISOString(),
+        size: entry.size,
+        ttl: entry.ttl
       };
     }
 
     return {
       cache: cacheData,
-      stats: this.cacheStats
+      stats: this.performanceMetrics
     };
   }
 
@@ -479,12 +764,15 @@ Response:`;
           sources: Array.isArray(d.sources) ? d.sources : [],
           techniques: Array.isArray(d.techniques) ? d.techniques : [],
           tools: Array.isArray(d.tools) ? d.tools : [],
-          codeExamples: Array.isArray(d.codeExamples) ? d.codeExamples : []
+          codeExamples: Array.isArray(d.codeExamples) ? d.codeExamples : [],
+          lastAccessed: new Date(typeof d.lastAccessed === 'string' ? d.lastAccessed : Date.now()),
+          size: typeof d.size === 'number' ? d.size : 0,
+          ttl: typeof d.ttl === 'number' ? d.ttl : 0
         };
         this.cache.set(key, entry);
       }
     }
-    this.cacheStats = cacheData.stats || this.cacheStats;
+    this.performanceMetrics = cacheData.stats || this.performanceMetrics;
     this.logger.info(`Imported ${this.cache.size} cache entries`);
   }
 }

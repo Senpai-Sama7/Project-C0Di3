@@ -124,6 +124,59 @@ export class ConfigManager {
     this.set('trainingMode', enabled);
   }
 
+  // Advanced mode - only accessible via environment variable
+  isSenseiMode(): boolean {
+    return process.env.ADVANCED_MODE === 'true' || process.env.ADVANCED_MODE === '1' ||
+           process.env.SENSEI_MODE === 'true' || process.env.SENSEI_MODE === '1';
+  }
+  setSenseiMode(enabled: boolean): void {
+    // This is intentionally not persisted to config
+    // Only accessible via environment variable
+  }
+
+  // System configuration protection
+  private advancedPasswordHash: string | null = null;
+  private advancedAuthenticated: boolean = false;
+
+  setSenseiPassword(password: string): void {
+    // Hash the password using a simple but effective method
+    const crypto = require('crypto');
+    this.advancedPasswordHash = crypto.createHash('sha256').update(password).digest('hex');
+  }
+
+  authenticateSensei(password: string): boolean {
+    if (!this.advancedPasswordHash) {
+      // Use environment variable or generate from system entropy
+      const envPassword = process.env.SENSEI_PASSWORD || process.env.SENSEI_DEFAULT_PASSWORD;
+      if (envPassword) {
+        this.setSenseiPassword(envPassword);
+      } else {
+        // Generate from system entropy if no environment variable
+        const crypto = require('crypto');
+        const entropy = crypto.randomBytes(32).toString('hex');
+        this.setSenseiPassword(entropy);
+      }
+    }
+
+    const crypto = require('crypto');
+    const inputHash = crypto.createHash('sha256').update(password).digest('hex');
+
+    if (inputHash === this.advancedPasswordHash) {
+      this.advancedAuthenticated = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  isSenseiAuthenticated(): boolean {
+    return this.advancedAuthenticated;
+  }
+
+  clearSenseiAuth(): void {
+    this.advancedAuthenticated = false;
+  }
+
   // Per-tool permissions (allow/deny, requireApproval, simulationOnly)
   getToolPermissions(toolName: string): any {
     return this.get(`toolPermissions.${toolName}`, { allow: true, requireApproval: false, simulationOnly: false });

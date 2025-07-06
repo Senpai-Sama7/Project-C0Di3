@@ -3,3 +3,6 @@
 *.zip
 *.mp4
 node_modules/
+
+# Advanced mode configuration
+.sensei

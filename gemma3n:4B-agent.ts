@@ -301,11 +301,14 @@ export class GemmaAgent {
   private async validateToolPermissions(reasoningPlan: any): Promise<void> {
     for (const step of reasoningPlan.steps) {
       if (step.type === 'tool') {
-        const perms = this.getToolPermissions(step.toolName);
+        const perms = this.isSenseiMode() ?
+          this.getSenseiToolPermissions(step.toolName) :
+          this.getToolPermissions(step.toolName);
+
         if (!perms.allow) {
           throw new Error(`Tool ${step.toolName} is not allowed in current mode.`);
         }
-        if (perms.requireApproval) {
+        if (perms.requireApproval && !this.isSenseiMode()) {
           throw new Error(`Tool ${step.toolName} requires user approval.`);
         }
         if (this.shouldSimulateTool(perms)) {
@@ -320,10 +323,23 @@ export class GemmaAgent {
    * Check if tool should be simulated
    */
   private shouldSimulateTool(perms: any): boolean {
-    return perms.simulationOnly ||
-      this.getSimulationMode() ||
-      this.getUserMode() === 'safe' ||
-      this.getUserMode() === 'simulation';
+    // Advanced mode bypasses all simulation
+    if (this.isSenseiMode()) {
+      return false;
+    }
+
+    // Check if tool should be simulated
+    if (perms.simulationOnly) {
+      return true;
+    }
+
+    // Check user mode simulation settings
+    const userMode = this.getUserMode();
+    if (userMode === 'safe' || userMode === 'beginner') {
+      return true;
+    }
+
+    return this.getSimulationMode();
   }
 
   /**
@@ -691,5 +707,74 @@ export class GemmaAgent {
    */
   importCAGCache(cacheData: any): void {
     this.cagService.importCache(cacheData);
+  }
+
+  // Advanced mode - full control, no restrictions
+  public isSenseiMode(): boolean {
+    return this.configManager.isSenseiMode() && this.configManager.isSenseiAuthenticated();
+  }
+
+  public setSenseiMode(enabled: boolean): void {
+    this.configManager.setSenseiMode(enabled);
+  }
+
+  public authenticateSensei(password: string): boolean {
+    return this.configManager.authenticateSensei(password);
+  }
+
+  public isSenseiAuthenticated(): boolean {
+    return this.configManager.isSenseiAuthenticated();
+  }
+
+  public clearSenseiAuth(): void {
+    this.configManager.clearSenseiAuth();
+  }
+
+  // Advanced mode tool permissions - bypass all restrictions
+  public getSenseiToolPermissions(toolName: string): any {
+    if (!this.isSenseiMode()) {
+      return this.getToolPermissions(toolName);
+    }
+    // Advanced mode: full access to everything
+    return {
+      allow: true,
+      requireApproval: false,
+      simulationOnly: false,
+      bypassRestrictions: true
+    };
+  }
+
+  // Advanced mode: full system control
+  public async senseiExecute(command: string, options: any = {}): Promise<any> {
+    if (!this.isSenseiMode()) {
+      throw new Error('Advanced mode required for this operation');
+    }
+
+    // Full system access in advanced mode
+    const result = await this.process(command, {
+      strategy: 'absolute-zero',
+      maxSteps: 10,
+      bypassRestrictions: true,
+      fullControl: true,
+      ...options
+    });
+
+    return result;
+  }
+
+  // Advanced mode: system diagnostics
+  public async senseiDiagnostics(): Promise<any> {
+    if (!this.isSenseiMode()) {
+      throw new Error('Advanced mode required for diagnostics');
+    }
+
+    return {
+      systemStatus: 'full_control',
+      restrictions: 'none',
+      simulation: false,
+      permissions: 'unlimited',
+      access: 'complete',
+      timestamp: new Date().toISOString()
+    };
   }
 }

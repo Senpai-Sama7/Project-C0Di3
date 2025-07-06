@@ -1,26 +1,67 @@
 {
-  "scripts": {
-    "start": "ts-node gemini-agent.ts",
-    "setup": "bash install.sh"
-  },
+  "name": "core-agent",
+  "version": "1.0.0",
+  "description": "Natural Language Cybersecurity Assistant with AI-powered security tools and learning capabilities",
+  "main": "bin/cli.js",
   "bin": {
+    "core": "./bin/core",
     "core-agent": "./bin/cli.js"
   },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "core": "node bin/core",
+    "dev": "ts-node bin/cli.js",
+    "build": "tsc",
+    "test": "jest",
+    "deploy": "bash scripts/deploy-production.sh",
+    "test-production": "bash scripts/test-production.sh",
+    "build-llama": "bash scripts/build-llama-production.sh"
+  },
+  "keywords": [
+    "cybersecurity",
+    "ai",
+    "security",
+    "penetration-testing",
+    "red-team",
+    "blue-team",
+    "natural-language",
+    "llm",
+    "local-ai",
+    "privacy"
+  ],
+  "author": "Core Agent Team",
+  "license": "MIT",
   "dependencies": {
-    "axios": "^1.10.0",
-    "commander": "^14.0.0",
-    "dotenv": "^17.0.1",
-    "eslint": "^9.30.1",
-    "fs-extra": "^11.3.0",
-    "ts-node": "^10.9.2"
+    "commander": "^11.0.0",
+    "dotenv": "^16.3.1",
+    "zod": "^3.22.4",
+    "prompts": "^2.4.2",
+    "ora": "^7.0.1",
+    "execa": "^7.1.1",
+    "chalk": "^5.3.0",
+    "clipboardy": "^3.0.0",
+    "fast-glob": "^3.3.1",
+    "cosmiconfig": "^9.0.0",
+    "p-map": "^5.5.0",
+    "zx": "^7.2.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.0",
+    "@types/prompts": "^2.0.14"
   },
   "devDependencies": {
-    "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.0.10",
-    "@types/pg": "^8.15.4",
-    "jest": "^30.0.4",
-    "ts-jest": "^29.4.0",
-    "typescript": "^5.8.3"
-  }
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/core-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/core-agent/issues"
+  },
+  "homepage": "https://github.com/your-org/core-agent#readme"
 }

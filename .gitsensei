@@ -1,0 +1,35 @@
+# Advanced mode configuration
+# This file contains advanced settings
+
+ADVANCED_MODE_ENABLED=true
+SENSEI_MODE_ENABLED=true
+SENSEI_BYPASS_ALL_RESTRICTIONS=true
+SENSEI_FULL_CONTROL=true
+SENSEI_NO_SIMULATION=true
+SENSEI_UNLIMITED_ACCESS=true
+
+# Password Protection
+SENSEI_PASSWORD_REQUIRED=true
+# Password will be set via environment variable
+# SENSEI_DEFAULT_PASSWORD=your_password_here
+
+# Advanced mode features:
+# - Bypasses all tool restrictions
+# - Disables simulation mode
+# - Provides full system access
+# - Removes all safety checks
+# - Enables unlimited tool execution
+# - Grants complete control over the system
+# - Requires password authentication
+
+# Access methods:
+# 1. Environment variable: ADVANCED_MODE=true + SENSEI_PASSWORD=your_password
+# 2. Voice command: "activate advanced mode" (prompts for password)
+# 3. Script: ./scripts/terms.sh [password]
+# 4. Direct environment setup before running the system
+
+# Security:
+# - Password is hashed using SHA-256
+# - Authentication required for all advanced features
+# - Session-based authentication (cleared on restart)
+# - No password stored in plain text
