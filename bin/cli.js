@@ -3,6 +3,7 @@ require('dotenv/config');
 require('ts-node/register');
 const { GemmaAgent } = require('../gemma3n:4B-agent');
 const { ToolRegistry } = require('../tools/tool-registry');
+const program = require('commander');
 
 async function main() {
   const args = process.argv.slice(2);
@@ -397,6 +398,247 @@ Help:
   } catch (err) {
     console.error('\n❌ Error:', err.message || err);
   }
+
+  // Add CAG commands
+  program
+    .command('cag:query <query>')
+    .description('Query cybersecurity knowledge using CAG (Cache-Augmented Generation)')
+    .option('-c, --category <category>', 'Filter by category (red-team, blue-team, tools, techniques, defense)')
+    .option('-d, --difficulty <difficulty>', 'Filter by difficulty (beginner, intermediate, advanced)')
+    .option('-m, --max-results <number>', 'Maximum number of results', '10')
+    .option('--no-code', 'Exclude code examples')
+    .option('--no-techniques', 'Exclude techniques')
+    .option('--no-cache', 'Disable caching for this query')
+    .action(async (query, options) => {
+      try {
+        const agent = await createAgent();
+        const result = await agent.queryCybersecurityKnowledgeCAG(query, {
+          category: options.category,
+          difficulty: options.difficulty,
+          maxResults: parseInt(options.maxResults),
+          includeCode: options.code !== false,
+          includeTechniques: options.techniques !== false,
+          useCache: options.cache !== false
+        });
+
+        console.log('\n🔍 CAG Query Results:');
+        console.log('='.repeat(50));
+        console.log(`Query: ${query}`);
+        console.log(`Cached: ${result.cached ? '✅ Yes' : '❌ No'}`);
+        console.log(`Cache Hit Type: ${result.cacheHitType}`);
+        console.log(`Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+        console.log(`Processing Time: ${result.processingTime}ms`);
+
+        if (result.similarityScore) {
+          console.log(`Similarity Score: ${(result.similarityScore * 100).toFixed(1)}%`);
+        }
+
+        console.log('\n📝 Response:');
+        console.log(result.response);
+
+        if (result.techniques && result.techniques.length > 0) {
+          console.log('\n🔧 Related Techniques:');
+          result.techniques.forEach(technique => console.log(`  • ${technique}`));
+        }
+
+        if (result.tools && result.tools.length > 0) {
+          console.log('\n🛠️  Related Tools:');
+          result.tools.forEach(tool => console.log(`  • ${tool}`));
+        }
+
+        if (result.codeExamples && result.codeExamples.length > 0) {
+          console.log('\n�� Code Examples:');
+          result.codeExamples.forEach((code, index) => {
+            console.log(`\n  Example ${index + 1}:`);
+            console.log(`  ${code}`);
+          });
+        }
+
+        if (result.sources && result.sources.length > 0) {
+          console.log('\n📚 Sources:');
+          result.sources.forEach(source => console.log(`  • ${source}`));
+        }
+
+      } catch (error) {
+        console.error('❌ CAG query failed:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:stats')
+    .description('Show CAG cache statistics')
+    .action(async () => {
+      try {
+        const agent = await createAgent();
+        const stats = agent.getCAGCacheStats();
+
+        console.log('\n📊 CAG Cache Statistics:');
+        console.log('='.repeat(50));
+        console.log(`Total Queries: ${stats.totalQueries}`);
+        console.log(`Cache Hits: ${stats.hits}`);
+        console.log(`Cache Misses: ${stats.misses}`);
+        console.log(`Hit Rate: ${stats.hitRate}`);
+        console.log(`Cache Size: ${stats.cacheSize} entries`);
+        console.log(`Embedding Cache Size: ${stats.embeddingCacheSize} entries`);
+        console.log(`Evictions: ${stats.evictions}`);
+
+        if (stats.totalQueries > 0) {
+          const avgResponseTime = stats.avgResponseTime || 0;
+          console.log(`Average Response Time: ${avgResponseTime.toFixed(2)}ms`);
+        }
+
+      } catch (error) {
+        console.error('❌ Failed to get CAG stats:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:clear')
+    .description('Clear CAG cache')
+    .action(async () => {
+      try {
+        const agent = await createAgent();
+        agent.clearCAGCache();
+        console.log('✅ CAG cache cleared successfully');
+      } catch (error) {
+        console.error('❌ Failed to clear CAG cache:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:prewarm')
+    .description('Pre-warm CAG cache with common cybersecurity queries')
+    .action(async () => {
+      try {
+        const agent = await createAgent();
+        console.log('🔥 Pre-warming CAG cache with common cybersecurity queries...');
+        await agent.preWarmCAGCache();
+        console.log('✅ CAG cache pre-warmed successfully');
+      } catch (error) {
+        console.error('❌ Failed to pre-warm CAG cache:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:export <file>')
+    .description('Export CAG cache to file')
+    .action(async (file) => {
+      try {
+        const agent = await createAgent();
+        const cacheData = agent.exportCAGCache();
+
+        const fs = require('fs');
+        fs.writeFileSync(file, JSON.stringify(cacheData, null, 2));
+        console.log(`✅ CAG cache exported to ${file}`);
+        console.log(`📊 Exported ${Object.keys(cacheData.cache).length} cache entries`);
+      } catch (error) {
+        console.error('❌ Failed to export CAG cache:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:import <file>')
+    .description('Import CAG cache from file')
+    .action(async (file) => {
+      try {
+        const agent = await createAgent();
+        const fs = require('fs');
+
+        if (!fs.existsSync(file)) {
+          console.error(`❌ File not found: ${file}`);
+          process.exit(1);
+        }
+
+        const cacheData = JSON.parse(fs.readFileSync(file, 'utf8'));
+        agent.importCAGCache(cacheData);
+        console.log(`✅ CAG cache imported from ${file}`);
+        console.log(`📊 Imported ${Object.keys(cacheData.cache).length} cache entries`);
+      } catch (error) {
+        console.error('❌ Failed to import CAG cache:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('cag:benchmark <queries-file>')
+    .description('Benchmark CAG performance with queries from file')
+    .option('-r, --runs <number>', 'Number of benchmark runs', '3')
+    .action(async (queriesFile, options) => {
+      try {
+        const agent = await createAgent();
+        const fs = require('fs');
+
+        if (!fs.existsSync(queriesFile)) {
+          console.error(`❌ File not found: ${queriesFile}`);
+          process.exit(1);
+        }
+
+        const queries = JSON.parse(fs.readFileSync(queriesFile, 'utf8'));
+        const runs = parseInt(options.runs);
+
+        console.log(`🚀 Running CAG benchmark with ${queries.length} queries, ${runs} runs each...`);
+
+        const results = {
+          totalQueries: queries.length * runs,
+          cacheHits: 0,
+          cacheMisses: 0,
+          totalTime: 0,
+          avgResponseTime: 0,
+          queries: []
+        };
+
+        for (let run = 1; run <= runs; run++) {
+          console.log(`\n📊 Run ${run}/${runs}:`);
+
+          for (const query of queries) {
+            const startTime = Date.now();
+            const result = await agent.queryCybersecurityKnowledgeCAG(query);
+            const endTime = Date.now();
+
+            const responseTime = endTime - startTime;
+            results.totalTime += responseTime;
+
+            if (result.cached) {
+              results.cacheHits++;
+            } else {
+              results.cacheMisses++;
+            }
+
+            results.queries.push({
+              query,
+              cached: result.cached,
+              responseTime,
+              cacheHitType: result.cacheHitType
+            });
+
+            console.log(`  ${result.cached ? '✅' : '❌'} ${query.substring(0, 50)}... (${responseTime}ms)`);
+          }
+        }
+
+        results.avgResponseTime = results.totalTime / results.totalQueries;
+        const hitRate = (results.cacheHits / results.totalQueries) * 100;
+
+        console.log('\n📊 Benchmark Results:');
+        console.log('='.repeat(50));
+        console.log(`Total Queries: ${results.totalQueries}`);
+        console.log(`Cache Hits: ${results.cacheHits}`);
+        console.log(`Cache Misses: ${results.cacheMisses}`);
+        console.log(`Hit Rate: ${hitRate.toFixed(2)}%`);
+        console.log(`Average Response Time: ${results.avgResponseTime.toFixed(2)}ms`);
+        console.log(`Total Time: ${(results.totalTime / 1000).toFixed(2)}s`);
+
+      } catch (error) {
+        console.error('❌ Benchmark failed:', error.message);
+        process.exit(1);
+      }
+    });
+
+  program.parse(process.argv);
 }
 
 async function runLearnMode(agent) {

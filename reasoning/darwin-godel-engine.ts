@@ -123,8 +123,8 @@ export class DarwinGodelEngine {
     // Replace prompt-based logic with real-world axiom extraction
     const axioms = [];
     // Example: Extract axioms from context and memories using NLP or predefined rules
-    if (context) axioms.push(...this.extractFromContext(context));
-    if (relevantMemories.memories) axioms.push(...this.extractFromMemories(relevantMemories.memories));
+    if (context) axioms.push(...(await this.extractFromContext(context)));
+    if (relevantMemories.memories) axioms.push(...(await this.extractFromMemories(relevantMemories.memories)));
     return axioms;
   }
 
@@ -136,7 +136,7 @@ export class DarwinGodelEngine {
     axioms: string[]
   ): Promise<string[]> {
     // Replace prompt-based logic with real-world hypothesis generation
-    const hypotheses = [];
+    const hypotheses: string[] = [];
     // Example: Generate hypotheses using combinatorial logic or domain-specific rules
     axioms.forEach(axiom => {
       hypotheses.push(`Hypothesis based on ${axiom}`);
@@ -203,11 +203,18 @@ export class DarwinGodelEngine {
         bestHypothesis = currentPopulation[maxIndex];
       }
 
+      // Await evolvePopulation and use the returned finalPopulation
+      const evolutionResult = await this.evolvePopulation(problem, currentPopulation, fitnessScores, axioms);
+      currentPopulation = evolutionResult.finalPopulation;
       fitnessHistory.push(maxFitness);
-      currentPopulation = this.evolvePopulation(problem, currentPopulation, fitnessScores, axioms);
     }
 
-    return { bestHypothesis, bestFitness, fitnessHistory, finalPopulation: currentPopulation };
+    return {
+      bestHypothesis,
+      bestFitness,
+      fitnessHistory,
+      finalPopulation: currentPopulation
+    };
   }
 
   /**
@@ -234,7 +241,7 @@ export class DarwinGodelEngine {
     currentPopulation: string[],
     fitnessScores: number[],
     axioms: string[]
-  ): Promise<string[]> {
+  ): Promise<EvolutionResult> {
     const nextGeneration: string[] = [];
 
     // Elitism: Keep the best hypothesis
@@ -264,7 +271,7 @@ export class DarwinGodelEngine {
       )
     );
 
-    return mutatedGeneration;
+    return { bestHypothesis: mutatedGeneration[0], bestFitness: 0, fitnessHistory: [], finalPopulation: mutatedGeneration };
   }
 
   /**
@@ -436,34 +443,6 @@ export class DarwinGodelEngine {
   private async extractFromMemories(memories: any[]): Promise<string[]> {
     this.logger.debug('Extracting axioms from memories:', memories);
     return ['Memory Axiom 1', 'Memory Axiom 2'];
-  }
-
-  private async evolvePopulation(
-    problem: string,
-    population: any[],
-    fitnessScores: number[],
-    axioms: string[]
-  ): Promise<any[]> {
-    this.logger.debug('Evolving population for problem:', problem);
-    return population.map(individual => ({ ...individual, fitness: Math.random() }));
-  }
-
-  async generatePlan(input: string, context: any, relevantMemories: any): Promise<any> {
-    this.logger.debug('Generating Darwin-Gödel reasoning plan for:', input);
-
-    const axiomsFromContext = await this.extractFromContext(context);
-    const axiomsFromMemories = await this.extractFromMemories(relevantMemories.memories);
-    const axioms = [...axiomsFromContext, ...axiomsFromMemories];
-
-    const initialPopulation = [{ plan: input }];
-    const fitnessScores = initialPopulation.map(() => Math.random());
-    const evolvedPopulation = await this.evolvePopulation(input, initialPopulation, fitnessScores, axioms);
-
-    const verifiedPlan = evolvedPopulation.find(individual =>
-      this.verifyConsistency(individual.plan)
-    );
-
-    return verifiedPlan || { error: 'No consistent plan found.' };
   }
 }
 

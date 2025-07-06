@@ -35,4 +35,12 @@ export class InMemoryVectorStore implements VectorStore {
     const sorted = results.sort((a, b) => b.score - a.score);
     return sorted.slice(0, k);
   }
+
+  async remove(id: string): Promise<void> {
+    this.data.delete(id);
+  }
+
+  async count(): Promise<number> {
+    return this.data.size;
+  }
 }

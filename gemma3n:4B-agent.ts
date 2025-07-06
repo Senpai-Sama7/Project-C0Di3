@@ -27,7 +27,7 @@ import { LearnModeService } from './services/learn-mode-service';
 import { LogAnalysisService } from './services/log-analysis-service';
 import { ToolRegistry } from './tools/tool-registry';
 import { Logger } from './utils/logger';
-import { CybersecurityKnowledgeService } from './services/cybersecurity-knowledge-service';
+import { CAGService } from './services/cag-service';
 
 /**
  * GemmaAgent - Core autonomous agent with advanced reasoning, learning capabilities,
@@ -51,6 +51,7 @@ export class GemmaAgent {
   private healthMonitoringService: HealthMonitoringService;
   private bookIngestionService: BookIngestionService;
   private cybersecurityKnowledgeService: CybersecurityKnowledgeService;
+  private cagService: CAGService;
 
   // Workspace integration properties
   private sessionId: string;
@@ -109,8 +110,14 @@ export class GemmaAgent {
       logToWorkspace: this.chatLogFile ? (data) => this.logToWorkspace('performance', data) : undefined
     });
 
-    // Core AI capabilities
-    this.client = new LlamaCppClient(this.configManager.get('llm.apiUrl', process.env.LLM_API_URL ?? 'http://localhost:8000'));
+    // Core AI capabilities - try llama.cpp first, fallback to mock client
+    try {
+      this.client = new LlamaCppClient(this.configManager.get('llm.apiUrl', process.env.LLM_API_URL ?? 'http://localhost:8000'));
+    } catch (error) {
+      console.log('Falling back to mock LLM client for testing');
+      const { MockLLMClient } = require('./clients/mock-llm-client');
+      this.client = new MockLLMClient();
+    }
 
     // Initialize learn mode service after client is available
     this.learnModeService = new LearnModeService(
@@ -121,10 +128,11 @@ export class GemmaAgent {
 
     // Memory systems
     this.memory = new MemorySystem({
-      vectorStore: this.configManager.get('memory.vectorStore', 'chromadb'),
+      vectorStoreType: this.configManager.get('memory.vectorStore', 'inmemory'),
       persistencePath: this.configManager.get('memory.persistencePath', './data/memory'),
-      cachingEnabled: this.configManager.get('memory.cachingEnabled', true),
-      embeddingModel: this.configManager.get('memory.embeddingModel', 'embedding-001'),
+      cacheSize: this.configManager.get('memory.cacheSize', 10000),
+      cacheTTL: this.configManager.get('memory.cacheTTL', 3600),
+      workingMemoryCapacity: this.configManager.get('memory.workingMemoryCapacity', 10),
       eventBus: this.eventBus
     });
 
@@ -134,6 +142,13 @@ export class GemmaAgent {
     this.cybersecurityKnowledgeService = new CybersecurityKnowledgeService(
       this.memory,
       this.client,
+      this.eventBus
+    );
+
+    // Initialize CAG service
+    this.cagService = new CAGService(
+      this.client,
+      this.cybersecurityKnowledgeService,
       this.eventBus
     );
 
@@ -568,5 +583,100 @@ export class GemmaAgent {
    */
   public getCybersecurityKnowledgeStatistics(): any {
     return this.cybersecurityKnowledgeService.getKnowledgeStatistics();
+  }
+
+  /**
+   * Query cybersecurity knowledge using CAG (Cache-Augmented Generation)
+   */
+  async queryCybersecurityKnowledgeCAG(query: string, options: any = {}): Promise<any> {
+    try {
+      const cagQuery = {
+        query,
+        category: options.category,
+        difficulty: options.difficulty,
+        maxResults: options.maxResults || 10,
+        includeCode: options.includeCode !== false,
+        includeTechniques: options.includeTechniques !== false,
+        useCache: options.useCache !== false,
+        context: options.context
+      };
+
+      const result = await this.cagService.query(cagQuery);
+
+      this.eventBus.emit('cybersecurity-knowledge.cag-query', {
+        query,
+        result: {
+          cached: result.cached,
+          cacheHitType: result.cacheHitType,
+          confidence: result.confidence,
+          processingTime: result.processingTime
+        }
+      });
+
+      return {
+        response: result.response,
+        concepts: [], // CAG doesn't return individual concepts
+        techniques: result.techniques,
+        tools: result.tools,
+        codeExamples: result.codeExamples,
+        confidence: result.confidence,
+        sources: result.sources,
+        cached: result.cached,
+        cacheHitType: result.cacheHitType,
+        similarityScore: result.similarityScore,
+        processingTime: result.processingTime
+      };
+    } catch (error) {
+      this.logger.error('CAG query failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get CAG cache statistics
+   */
+  getCAGCacheStats(): any {
+    return this.cagService.getCacheStats();
+  }
+
+  /**
+   * Clear CAG cache
+   */
+  clearCAGCache(): void {
+    this.cagService.clearCache();
+  }
+
+  /**
+   * Pre-warm CAG cache with common cybersecurity queries
+   */
+  async preWarmCAGCache(): Promise<void> {
+    const commonQueries = [
+      "What is network reconnaissance?",
+      "How do I detect SQL injection?",
+      "What are common web vulnerabilities?",
+      "How to perform penetration testing?",
+      "What is lateral movement?",
+      "How to monitor network traffic?",
+      "What are the OWASP Top 10?",
+      "How to analyze malware?",
+      "What is incident response?",
+      "How to secure web applications?"
+    ];
+
+    await this.cagService.preWarmCache(commonQueries);
+  }
+
+  /**
+   * Export CAG cache for persistence
+   */
+  exportCAGCache(): any {
+    return this.cagService.exportCache();
+  }
+
+  /**
+   * Import CAG cache from persistence
+   */
+  importCAGCache(cacheData: any): void {
+    this.cagService.importCache(cacheData);
   }
 }

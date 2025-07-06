@@ -544,7 +544,7 @@ export class ReasoningEngine {
           includeTechniques: true
         });
 
-        if (knowledge.concepts.length > 0) {
+        if (typeof knowledge === 'object' && knowledge !== null && 'concepts' in knowledge && Array.isArray(knowledge.concepts)) {
           enhancedContext.cybersecurityKnowledge = enhancedContext.cybersecurityKnowledge || {};
           enhancedContext.cybersecurityKnowledge[term] = knowledge;
         }
@@ -643,23 +643,23 @@ export class ReasoningEngine {
     let enhancedPrompt = prompt;
 
     for (const [term, knowledgeData] of Object.entries(knowledge)) {
-      if (knowledgeData.concepts && knowledgeData.concepts.length > 0) {
-        const concept = knowledgeData.concepts[0];
+      if (typeof knowledgeData === 'object' && knowledgeData !== null && 'concepts' in knowledgeData && Array.isArray((knowledgeData as any).concepts)) {
+        const concept = (knowledgeData as any).concepts[0];
         enhancedPrompt += `\n\nRelevant cybersecurity knowledge for "${term}":\n`;
         enhancedPrompt += `- Concept: ${concept.name}\n`;
         enhancedPrompt += `- Description: ${concept.description}\n`;
         enhancedPrompt += `- Category: ${concept.category}\n`;
 
-        if (knowledgeData.techniques && knowledgeData.techniques.length > 0) {
-          enhancedPrompt += `- Related techniques: ${knowledgeData.techniques.join(', ')}\n`;
+        if ('techniques' in knowledgeData && Array.isArray((knowledgeData as any).techniques) && (knowledgeData as any).techniques.length > 0) {
+          enhancedPrompt += `- Related techniques: ${(knowledgeData as any).techniques.join(', ')}\n`;
         }
 
-        if (knowledgeData.tools && knowledgeData.tools.length > 0) {
-          enhancedPrompt += `- Related tools: ${knowledgeData.tools.join(', ')}\n`;
+        if ('tools' in knowledgeData && Array.isArray((knowledgeData as any).tools) && (knowledgeData as any).tools.length > 0) {
+          enhancedPrompt += `- Related tools: ${(knowledgeData as any).tools.join(', ')}\n`;
         }
 
-        if (knowledgeData.codeExamples && knowledgeData.codeExamples.length > 0) {
-          enhancedPrompt += `- Code examples: ${knowledgeData.codeExamples.slice(0, 2).join('\n')}\n`;
+        if ('codeExamples' in knowledgeData && Array.isArray((knowledgeData as any).codeExamples) && (knowledgeData as any).codeExamples.length > 0) {
+          enhancedPrompt += `- Code examples: ${(knowledgeData as any).codeExamples.slice(0, 2).join('\n')}\n`;
         }
       }
     }
@@ -691,7 +691,7 @@ export interface ReasoningEngineOptions {
   toolRegistry?: ToolRegistry;
   eventBus?: EventBus;
   zeroShotEnabled?: boolean;
-  cybersecurityKnowledgeService?: CybersecurityKnowledgeService;
+  cybersecurityKnowledgeService: CybersecurityKnowledgeService;
 }
 
 export interface ReasoningOptions {

@@ -72,6 +72,9 @@ export class MemorySystem {
       case 'inmemory':
         return new InMemoryVectorStore();
       case 'postgres':
+        if (!options.connectionString) {
+          throw new Error('PostgresVectorStore requires a connectionString');
+        }
         return new PostgresVectorStore(options.connectionString);
       default:
         throw new Error(`Unsupported vector store type: ${options.vectorStoreType}`);
@@ -342,10 +345,21 @@ export class MemorySystem {
   }
 
   public async retrieveMemoryStatistics(): Promise<MemoryStatistics> {
+    const [semanticCount, episodicCount, proceduralCount, conceptCount] = await Promise.all([
+      (await this.semanticMemory.getAll()).length,
+      (await this.episodicMemory.getAll()).length,
+      (await this.proceduralMemory.getAll()).length,
+      (await this.conceptGraph.getNodes()).length
+    ]);
+
     return {
-      cacheHitRate: this.memoryCache.hitRate(),
+      totalMemories: semanticCount + episodicCount + proceduralCount,
+      semanticMemories: semanticCount,
+      episodicMemories: episodicCount,
+      proceduralMemories: proceduralCount,
+      concepts: conceptCount,
       cacheSize: this.memoryCache.size(),
-      vectorStoreType: this.vectorStore.constructor.name,
+      cacheHitRate: this.memoryCache.hitRate()
     };
   }
 }

@@ -1,13 +1,25 @@
-import { Pool } from 'pg';
+// Conditional import to avoid errors when pg is not installed
+let Pool: any;
+try {
+  const pg = require('pg');
+  Pool = pg.Pool;
+} catch (error) {
+  // pg module not available, will throw error if PostgresVectorStore is instantiated
+  Pool = null;
+}
+
 import { EmbeddingService } from '../../services/embedding-service';
 import { DocumentChunk, SearchResult, VectorStore } from '../vector-store';
 
 export class PostgresVectorStore implements VectorStore {
-  private readonly pool: Pool;
+  private readonly pool: any;
   private readonly tableName: string;
   private readonly embeddingService: EmbeddingService;
 
   constructor(connectionString: string, tableName: string = 'documents') {
+    if (!Pool) {
+      throw new Error('PostgreSQL client (pg) is not installed. Please install it with: npm install pg');
+    }
     this.pool = new Pool({ connectionString });
     this.tableName = tableName;
     this.embeddingService = new EmbeddingService();
@@ -72,7 +84,26 @@ export class PostgresVectorStore implements VectorStore {
         `SELECT id, content, 1 - (embedding <=> $1) as score FROM ${this.tableName} WHERE 1 - (embedding <=> $1) > $2 ORDER BY score DESC LIMIT $3`,
         [JSON.stringify(queryEmbedding), threshold, k]
       );
-      return result.rows.map(row => ({ id: row.id, text: row.content, score: row.score }));
+      return result.rows.map((row: any) => ({ id: row.id, text: row.content, score: row.score }));
+    } finally {
+      client.release();
+    }
+  }
+
+  async remove(id: string): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query(`DELETE FROM ${this.tableName} WHERE id = $1`, [id]);
+    } finally {
+      client.release();
+    }
+  }
+
+  async count(): Promise<number> {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
+      return parseInt(result.rows[0].count);
     } finally {
       client.release();
     }

@@ -18,4 +18,16 @@ export class ChromaDBVectorStore implements VectorStore {
     console.log(`Finding ${k} similar vectors for "${query}" with threshold ${threshold}`);
     return Promise.resolve([]);
   }
+
+  async remove(id: string): Promise<void> {
+    // TODO: Implement ChromaDB remove logic
+    console.log(`Removing from ChromaDB: ${id}`);
+    return Promise.resolve();
+  }
+
+  async count(): Promise<number> {
+    // TODO: Implement ChromaDB count logic
+    console.log(`Counting documents in ChromaDB`);
+    return Promise.resolve(0);
+  }
 }

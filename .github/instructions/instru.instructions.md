@@ -1,1 +1,0 @@
-A world-class, autonomous cybersecurity agent system with expert-level Red/Blue team tooling, real-time guidance, GUI/CLI interface, educational feedback, and full local autonomy. a fully modular, offline-first AI cybersecurity assistant with both red and blue team capabilities. This system must serve both non-technical users and cybersecurity professionals.

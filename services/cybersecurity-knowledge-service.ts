@@ -183,8 +183,8 @@ export class CybersecurityKnowledgeService {
     concepts: Array<{
       name: string;
       description: string;
-      category: string;
-      difficulty: string;
+      category: 'red-team' | 'blue-team' | 'general' | 'tools' | 'techniques' | 'defense';
+      difficulty: 'beginner' | 'intermediate' | 'advanced';
       tools: string[];
       techniques: string[];
       codeExamples: string[];
@@ -218,11 +218,32 @@ export class CybersecurityKnowledgeService {
 
     try {
       const response = await this.client.generate({ prompt });
-      return JSON.parse(response);
+      const result = JSON.parse(response);
+
+      // Validate and sanitize the response
+      if (result.concepts && Array.isArray(result.concepts)) {
+        result.concepts = result.concepts.map((concept: any) => ({
+          ...concept,
+          category: this.validateCategory(concept.category),
+          difficulty: this.validateDifficulty(concept.difficulty)
+        }));
+      }
+
+      return result;
     } catch (error) {
       this.logger.warn('Failed to analyze content for concepts:', error);
       return { concepts: [] };
     }
+  }
+
+  private validateCategory(category: string): 'red-team' | 'blue-team' | 'general' | 'tools' | 'techniques' | 'defense' {
+    const validCategories = ['red-team', 'blue-team', 'general', 'tools', 'techniques', 'defense'];
+    return validCategories.includes(category) ? category as any : 'general';
+  }
+
+  private validateDifficulty(difficulty: string): 'beginner' | 'intermediate' | 'advanced' {
+    const validDifficulties = ['beginner', 'intermediate', 'advanced'];
+    return validDifficulties.includes(difficulty) ? difficulty as any : 'intermediate';
   }
 
   /**
@@ -234,7 +255,9 @@ export class CybersecurityKnowledgeService {
     for (const concept of this.concepts.values()) {
       try {
         const embeddingText = `${concept.name} ${concept.description} ${concept.content}`;
-        concept.embedding = await this.client.embed(embeddingText);
+        if (this.client && this.client.embed) {
+          concept.embedding = await this.client.embed(embeddingText);
+        }
       } catch (error) {
         this.logger.warn(`Failed to create embedding for concept ${concept.name}:`, error);
       }
@@ -278,11 +301,11 @@ export class CybersecurityKnowledgeService {
     if (!concept1.embedding || !concept2.embedding) return 0;
 
     // Simple cosine similarity calculation
-    const dotProduct = concept1.embedding.reduce((sum, val, i) => sum + val * concept2.embedding[i], 0);
+    const dotProduct = concept1.embedding.reduce((sum, val, i) => sum + val * (concept2.embedding?.[i] || 0), 0);
     const magnitude1 = Math.sqrt(concept1.embedding.reduce((sum, val) => sum + val * val, 0));
-    const magnitude2 = Math.sqrt(concept2.embedding.reduce((sum, val) => sum + val * val, 0));
+    const magnitude2 = Math.sqrt((concept2.embedding || []).reduce((sum, val) => sum + val * val, 0));
 
-    return dotProduct / (magnitude1 * magnitude2);
+    return magnitude1 && magnitude2 ? dotProduct / (magnitude1 * magnitude2) : 0;
   }
 
   /**
@@ -325,6 +348,11 @@ export class CybersecurityKnowledgeService {
    * Find relevant concepts using semantic search
    */
   private async findRelevantConcepts(query: KnowledgeQuery): Promise<CybersecurityConcept[]> {
+    if (!this.client || !this.client.embed) {
+      this.logger.warn('Client or embed method not available');
+      return [];
+    }
+
     const queryEmbedding = await this.client.embed(query.query);
     const relevant: Array<{ concept: CybersecurityConcept; score: number }> = [];
 
