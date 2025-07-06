@@ -294,9 +294,49 @@ git clone <repo-url>
 cd core
 bash scripts/setup.sh
 ./start-services.sh
+
+# Start the natural language interface
+node bin/cli.js
 ```
 
 *That's it. Your cybersecurity evolution begins now.*
+
+## Natural Language Interface
+
+Core Agent now features a powerful natural language interface that understands your intent and executes the appropriate actions. No more complex command-line arguments - just speak naturally to your cybersecurity assistant.
+
+### **Examples:**
+
+```bash
+# Start the interface
+node bin/cli.js
+
+# Then use natural language:
+"Check system health"
+"Analyze recent logs for threats"
+"Run nmap scan on 192.168.1.0/24"
+"Explain SQL injection"
+"Start a reconnaissance mission"
+"List available security tools"
+"What are the latest cybersecurity threats?"
+"How do I detect malware?"
+"Show me network monitoring techniques"
+```
+
+### **Training Mode (Safe Learning Environment)**
+
+For learning and training, use the dedicated training mode:
+
+```bash
+# Enter training mode (simulation enabled for safety)
+node bin/cli.js --learn-mode
+
+# Or start a specific mission
+node bin/cli.js
+"Start reconnaissance mission"
+```
+
+*Training mode automatically enables simulation for safety while learning.*
 
 ---
 

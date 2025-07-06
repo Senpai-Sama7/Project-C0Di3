@@ -108,12 +108,20 @@ export class ConfigManager {
     this.set('userMode', mode);
   }
 
-  // Simulation mode (true/false)
+  // Simulation mode (true/false) - default to false for production safety
   getSimulationMode(): boolean {
-    return this.get('simulationMode', true);
+    return this.get('simulationMode', false);
   }
   setSimulationMode(enabled: boolean): void {
     this.set('simulationMode', enabled);
+  }
+
+  // Check if we're in training/learning mode
+  isTrainingMode(): boolean {
+    return this.get('trainingMode', false);
+  }
+  setTrainingMode(enabled: boolean): void {
+    this.set('trainingMode', enabled);
   }
 
   // Per-tool permissions (allow/deny, requireApproval, simulationOnly)

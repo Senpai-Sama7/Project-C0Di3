@@ -467,8 +467,21 @@ export class GemmaAgent {
   public getSimulationMode(): boolean {
     return this.configManager.getSimulationMode();
   }
+
   public setSimulationMode(enabled: boolean): void {
     this.configManager.setSimulationMode(enabled);
+  }
+
+  public isTrainingMode(): boolean {
+    return this.configManager.isTrainingMode();
+  }
+
+  public setTrainingMode(enabled: boolean): void {
+    this.configManager.setTrainingMode(enabled);
+    // In training mode, enable simulation for safety
+    if (enabled) {
+      this.setSimulationMode(true);
+    }
   }
 
   /**

@@ -13,7 +13,7 @@ Welcome! This guide will help you use the Core Agent system, even if you have no
 
 - [What is Core Agent?](#1-what-is-core-agent)
 - [Starting the Agent](#2-starting-the-agent)
-- [Using the Agent](#3-using-the-agent-simple-commands)
+- [Using the Agent](#3-using-the-agent-natural-language-interface)
 - [Main Features](#4-main-features-no-coding-needed)
 - [Learning Missions](#5-learning-missions-learn-mode)
 - [Safety Features](#6-safety-features)
@@ -85,22 +85,38 @@ The AI processes 4 cybersecurity books:
 
 ---
 
-## 3. Using the Agent (Simple Commands)
+## 3. Using the Agent (Natural Language Interface)
 
-When you see a prompt like this:
+When you start the agent, you'll see a prompt like this:
 
 ```
-🤖 Enter your prompt:
+🤖 Core Agent - Natural Language Cybersecurity Assistant
+==================================================
+💡 Type your request in natural language. Examples:
+   "Check system health"
+   "Analyze logs for threats"
+   "Run nmap scan on localhost"
+   "Explain SQL injection"
+   "Start learning mission"
+   "List available tools"
+   "exit" or "quit" to exit
+
+🤖 Enter your request:
 ```
 
-Type what you want the agent to do! For example:
+**Simply type what you want the agent to do in natural language!** For example:
 
-- "Explain phishing"
-- "Scan my network for threats"
+- "Check if my system is secure"
+- "Scan my network for vulnerabilities"
 - "Show me recent security alerts"
 - "Start a learning mission"
 - "What are lateral movement techniques?"
 - "How do I detect network intrusions?"
+- "Explain phishing attacks"
+- "Run a port scan on 192.168.1.1"
+- "What tools are available for penetration testing?"
+
+**The AI understands your intent and will execute the appropriate actions automatically.**
 
 ---
 
