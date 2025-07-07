@@ -1,28 +1,39 @@
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
 import { Tool } from '../../types';
 
+/**
+ * SuricataTool securely wraps the Suricata CLI for network threat detection.
+ * All user input is strictly validated and passed as arguments to prevent command injection.
+ */
 export class SuricataTool implements Tool {
   name = 'suricata';
   description = 'Suricata network threat detection engine for monitoring and alerting';
 
   async execute(input: any, context?: any): Promise<any> {
-    const { action, interface: iface, rules, logFile, alertsOnly } = input;
-    if (!rules || !iface || !logFile) throw new Error('Rules, interface, and log file are required');
-
+    const { interface: iface, rules, logFile } = input;
+    if (!rules || typeof rules !== 'string' || !/^[\w./-]+$/.test(rules)) {
+      throw new Error('Rules is required and must be a valid file path.');
+    }
+    if (!iface || typeof iface !== 'string' || !/^\w+$/.test(iface)) {
+      throw new Error('Interface is required and must be a valid network interface name.');
+    }
+    if (!logFile || typeof logFile !== 'string' || !/^[\w./-]+$/.test(logFile)) {
+      throw new Error('Log file is required and must be a valid file path.');
+    }
+    const args = ['-c', rules, '-i', iface, '-l', logFile];
     return new Promise((resolve, reject) => {
-      const command = `suricata -c ${rules} -i ${iface} -l ${logFile}`;
-      exec(command, { timeout: 60000 }, (err, stdout, stderr) => {
-        if (err) {
-          console.error('Suricata execution error:', stderr || err.message);
-          return reject(new Error(stderr || err.message));
+      const proc = spawn('suricata', args, { timeout: 60000 });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (data) => { stdout += data.toString(); });
+      proc.stderr.on('data', (data) => { stderr += data.toString(); });
+      proc.on('error', (err) => reject(new Error('Failed to start suricata: ' + err.message)));
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(stderr || `suricata exited with code ${code}`));
         }
         const summary = stdout.split('\n').slice(0, 10).join('\n');
-        console.info('Suricata execution success:', summary);
-        resolve({
-          summary,
-          full: stdout,
-          success: true
-        });
+        resolve({ summary, full: stdout, success: true });
       });
     });
   }

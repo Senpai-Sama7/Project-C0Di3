@@ -9,7 +9,7 @@ export class WazuhTool implements Tool {
     const { action, agent, rule, logType, timeRange } = input;
     if (!action || !agent || !rule) throw new Error('Action, agent, and rule are required');
 
-    const apiUrl = process.env.WAZUH_API_URL || 'http://localhost:55000';
+    const apiUrl = process.env.WAZUH_API_URL ?? 'http://localhost:55000';
     const endpoint = `${apiUrl}/${action}`;
     const payload = { agent, rule, logType, timeRange };
 

@@ -1,11 +1,11 @@
 import { EventBus } from '../events/event-bus';
 import { Logger } from '../utils/logger';
+import { OsqueryTool } from './blue/osquery';
+import { SnortTool } from './blue/snort';
+import { YaraTool } from './blue/yara';
+import { BurpSuiteTool } from './red/burpsuite';
 import { NmapTool } from './red/nmap';
 import { SqlmapTool } from './red/sqlmap';
-import { BurpSuiteTool } from './red/burpsuite';
-import { SnortTool } from './blue/snort';
-import { OsqueryTool } from './blue/osquery';
-import { YaraTool } from './blue/yara';
 
 export interface Tool {
   name: string;
@@ -22,9 +22,9 @@ export interface ToolExecutionResult {
 }
 
 export class ToolRegistry {
-  private tools: Map<string, Tool> = new Map();
-  private eventBus: EventBus;
-  private logger: Logger;
+  private readonly tools: Map<string, Tool> = new Map();
+  private readonly eventBus: EventBus;
+  private readonly logger: Logger;
 
   constructor(eventBus?: EventBus) {
     this.eventBus = eventBus || new EventBus();
@@ -87,17 +87,17 @@ export class ToolRegistry {
       }
 
       // Check for simulation/permissions in context
-      if (context && (context.simulation || (context.permissions && context.permissions.simulationOnly))) {
+      if (context?.simulation || context?.permissions?.simulationOnly) {
         return {
           success: true,
           result: `[SIMULATED OUTPUT for ${name}]`,
           executionTime: 0
         };
       }
-      if (context && context.permissions && context.permissions.requireApproval) {
+      if (context?.permissions?.requireApproval) {
         throw new Error(`Tool ${name} requires user approval.`);
       }
-      if (context && context.permissions && context.permissions.allow === false) {
+      if (context?.permissions?.allow === false) {
         throw new Error(`Tool ${name} is not allowed.`);
       }
 
@@ -135,7 +135,7 @@ export class ToolRegistry {
     return this.list().map(tool => ({
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters || {}
+      parameters: tool.parameters ?? {}
     }));
   }
 

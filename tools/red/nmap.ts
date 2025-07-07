@@ -1,6 +1,10 @@
+import { spawn } from 'child_process';
 import { Tool } from '../tool-registry';
-import { exec } from 'child_process';
 
+/**
+ * NmapTool securely wraps the nmap CLI for network scanning.
+ * All user input is strictly validated and passed as arguments to prevent command injection.
+ */
 export const NmapTool: Tool = {
   name: 'nmap',
   description: 'Network scanner for host discovery and vulnerability detection.',
@@ -10,21 +14,29 @@ export const NmapTool: Tool = {
   },
   async execute(input: any, context?: any): Promise<any> {
     const { target, options = '' } = input;
-    if (!target) throw new Error('Target is required');
-
+    if (!target || typeof target !== 'string' || !/^[\w.:-]+$/.test(target)) {
+      throw new Error('Target is required and must be a valid IP or hostname.');
+    }
+    // Only allow safe nmap options (letters, dashes, numbers, spaces, dots, slashes)
+    if (options && !/^[\w\s\-./]*$/.test(options)) {
+      throw new Error('Options contain invalid characters.');
+    }
+    // Split options into array, filter out empty strings
+    const optionArgs = options ? options.split(' ').filter(Boolean) : [];
+    const args = [...optionArgs, target];
     return new Promise((resolve, reject) => {
-      exec(`nmap ${options} ${target}`, { timeout: 60000 }, (err, stdout, stderr) => {
-        if (err) {
-          console.error('Nmap execution error:', stderr || err.message);
-          return reject(new Error(stderr || err.message));
+      const proc = spawn('nmap', args, { timeout: 60000 });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (data) => { stdout += data.toString(); });
+      proc.stderr.on('data', (data) => { stderr += data.toString(); });
+      proc.on('error', (err) => reject(new Error('Failed to start nmap: ' + err.message)));
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(stderr || `nmap exited with code ${code}`));
         }
         const summary = stdout.split('\n').slice(0, 10).join('\n');
-        console.info('Nmap execution success:', summary);
-        resolve({
-          summary,
-          full: stdout,
-          success: true
-        });
+        resolve({ summary, full: stdout, success: true });
       });
     });
   }

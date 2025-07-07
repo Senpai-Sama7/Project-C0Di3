@@ -1,6 +1,6 @@
 import { EventBus } from '../events/event-bus';
-import { Logger } from '../utils/logger';
 import { LLMClient } from '../types';
+import { Logger } from '../utils/logger';
 import { CybersecurityKnowledgeService } from './cybersecurity-knowledge-service';
 
 export interface CacheEntry {
@@ -65,9 +65,9 @@ export class CAGService {
   private readonly eventBus: EventBus;
   private readonly logger: Logger;
 
-  private cache: Map<string, CacheEntry> = new Map();
-  private embeddingCache: Map<string, number[]> = new Map();
-  private performanceMetrics: CAGPerformanceMetrics = {
+  private readonly cache: Map<string, CacheEntry> = new Map();
+  private readonly embeddingCache: Map<string, number[]> = new Map();
+  private readonly performanceMetrics: CAGPerformanceMetrics = {
     totalQueries: 0,
     cacheHits: 0,
     cacheMisses: 0,
@@ -89,7 +89,7 @@ export class CAGService {
   private readonly maxResponseTime = 10000; // 10 second timeout
 
   // Performance tracking
-  private responseTimes: number[] = [];
+  private readonly responseTimes: number[] = [];
   private readonly maxResponseTimeHistory = 1000;
 
   constructor(
@@ -117,7 +117,7 @@ export class CAGService {
 
     try {
       // Set timeout for the entire operation
-      const timeout = query.timeout || this.maxResponseTime;
+      const timeout = query.timeout ?? this.maxResponseTime;
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Query timeout')), timeout);
       });
@@ -146,12 +146,17 @@ export class CAGService {
       this.eventBus.emit('cag.query.failed', { queryId, error: errorMessage });
 
       return {
-        success: false,
-        queryId,
-        response: null,
-        cacheHit: false,
+        response: `ERROR: ${errorMessage}`,
+        cached: false,
+        confidence: 0,
+        sources: [],
+        techniques: [],
+        tools: [],
+        codeExamples: [],
+        cacheHitType: 'none',
         processingTime: Date.now() - startTime,
-        error: errorMessage
+        cacheSize: this.cache.size,
+        memoryUsage: this.getMemoryUsage(),
       };
     }
   }
@@ -267,7 +272,7 @@ export class CAGService {
       const similarity = this.calculateSimilarity(queryEmbedding, entry.queryEmbedding);
 
       if (similarity > threshold &&
-          (!bestMatch || similarity > bestMatch.similarity)) {
+        (!bestMatch || similarity > bestMatch.similarity)) {
         bestMatch = { entry, similarity };
       }
     }
@@ -303,7 +308,7 @@ export class CAGService {
       query: query.query,
       category: query.category,
       difficulty: query.difficulty,
-      maxResults: query.maxResults || 15, // Increased for better coverage
+      maxResults: query.maxResults ?? 15, // Increased for better coverage
       includeCode: query.includeCode,
       includeTechniques: query.includeTechniques
     });
@@ -342,7 +347,14 @@ export class CAGService {
     // Calculate adaptive TTL based on query characteristics
     const baseTTL = this.defaultCacheTTL;
     const confidenceMultiplier = result.confidence;
-    const priorityMultiplier = query.priority === 'high' ? 1.5 : query.priority === 'low' ? 0.7 : 1.0;
+    let priorityMultiplier: number;
+    if (query.priority === 'high') {
+      priorityMultiplier = 1.5;
+    } else if (query.priority === 'low') {
+      priorityMultiplier = 0.7;
+    } else {
+      priorityMultiplier = 1.0;
+    }
     const adaptiveTTL = baseTTL * confidenceMultiplier * priorityMultiplier;
 
     const entry: CacheEntry = {
@@ -408,9 +420,8 @@ export class CAGService {
     let evictedCount = 0;
     const targetMemoryUsage = this.maxMemoryUsage * 0.8; // Target 80% of max
 
-    for (const [key, entry] of entries) {
+    for (const [key] of entries) {
       if (this.getMemoryUsage() <= targetMemoryUsage) break;
-
       this.cache.delete(key);
       evictedCount++;
       this.performanceMetrics.evictions++;
@@ -587,10 +598,10 @@ export class CAGService {
    * Generate cache key based on query and context
    */
   private generateCacheKey(query: CAGQuery): string {
-    const contextStr = JSON.stringify(query.context || {});
-    const categoryStr = query.category || '';
-    const difficultyStr = query.difficulty || '';
-    const priorityStr = query.priority || 'normal';
+    const contextStr = JSON.stringify(query.context ?? {});
+    const categoryStr = query.category ?? '';
+    const difficultyStr = query.difficulty ?? '';
+    const priorityStr = query.priority ?? 'normal';
 
     return `${query.query}:${contextStr}:${categoryStr}:${difficultyStr}:${priorityStr}`;
   }
@@ -603,7 +614,7 @@ export class CAGService {
       return this.embeddingCache.get(query)!;
     }
 
-    if (!this.client || !this.client.embed) {
+    if (!(this.client?.embed)) {
       throw new Error('Embedding client or embed method is not available');
     }
 
@@ -648,7 +659,7 @@ export class CAGService {
    */
   private generateContextHash(query: CAGQuery): string {
     const crypto = require('crypto');
-    const contextStr = JSON.stringify(query.context || {});
+    const contextStr = JSON.stringify(query.context ?? {});
     return crypto.createHash('md5').update(contextStr).digest('hex');
   }
 
@@ -701,17 +712,16 @@ export class CAGService {
   clearCache(): void {
     this.cache.clear();
     this.embeddingCache.clear();
-    this.performanceMetrics = {
-      totalQueries: 0,
-      cacheHits: 0,
-      cacheMisses: 0,
-      averageResponseTime: 0,
-      hitRate: 0,
-      memoryUsage: 0,
-      cacheSize: 0,
-      evictions: 0,
-      prewarmQueries: 0
-    };
+    // Reset all fields of performanceMetrics instead of reassigning
+    this.performanceMetrics.totalQueries = 0;
+    this.performanceMetrics.cacheHits = 0;
+    this.performanceMetrics.cacheMisses = 0;
+    this.performanceMetrics.averageResponseTime = 0;
+    this.performanceMetrics.hitRate = 0;
+    this.performanceMetrics.memoryUsage = 0;
+    this.performanceMetrics.cacheSize = 0;
+    this.performanceMetrics.evictions = 0;
+    this.performanceMetrics.prewarmQueries = 0;
     this.logger.info('Cache cleared');
   }
 
@@ -750,29 +760,49 @@ export class CAGService {
    */
   importCache(cacheData: any): void {
     this.cache.clear();
-
     for (const [key, data] of Object.entries(cacheData.cache)) {
       const d = data as Record<string, any>;
-      if (typeof d === 'object' && d !== null) {
-        const entry: CacheEntry = {
-          response: typeof d.response === 'string' ? d.response : '',
-          timestamp: new Date(typeof d.timestamp === 'string' ? d.timestamp : Date.now()),
-          accessCount: typeof d.accessCount === 'number' ? d.accessCount : 0,
-          queryEmbedding: Array.isArray(d.queryEmbedding) ? d.queryEmbedding : [],
-          contextHash: typeof d.contextHash === 'string' ? d.contextHash : '',
-          confidence: typeof d.confidence === 'number' ? d.confidence : 0,
-          sources: Array.isArray(d.sources) ? d.sources : [],
-          techniques: Array.isArray(d.techniques) ? d.techniques : [],
-          tools: Array.isArray(d.tools) ? d.tools : [],
-          codeExamples: Array.isArray(d.codeExamples) ? d.codeExamples : [],
-          lastAccessed: new Date(typeof d.lastAccessed === 'string' ? d.lastAccessed : Date.now()),
-          size: typeof d.size === 'number' ? d.size : 0,
-          ttl: typeof d.ttl === 'number' ? d.ttl : 0
-        };
+      if (this.isValidCacheEntryData(d)) {
+        const entry = this.parseCacheEntry(d);
         this.cache.set(key, entry);
       }
     }
-    this.performanceMetrics = cacheData.stats || this.performanceMetrics;
+    this.updatePerformanceMetricsFromStats(cacheData.stats);
     this.logger.info(`Imported ${this.cache.size} cache entries`);
+  }
+
+  private isValidCacheEntryData(d: Record<string, any>): boolean {
+    return typeof d === 'object' && d !== null;
+  }
+
+  private parseCacheEntry(d: Record<string, any>): CacheEntry {
+    return {
+      response: typeof d.response === 'string' ? d.response : '',
+      timestamp: new Date(typeof d.timestamp === 'string' ? d.timestamp : Date.now()),
+      accessCount: typeof d.accessCount === 'number' ? d.accessCount : 0,
+      queryEmbedding: Array.isArray(d.queryEmbedding) ? d.queryEmbedding : [],
+      contextHash: typeof d.contextHash === 'string' ? d.contextHash : '',
+      confidence: typeof d.confidence === 'number' ? d.confidence : 0,
+      sources: Array.isArray(d.sources) ? d.sources : [],
+      techniques: Array.isArray(d.techniques) ? d.techniques : [],
+      tools: Array.isArray(d.tools) ? d.tools : [],
+      codeExamples: Array.isArray(d.codeExamples) ? d.codeExamples : [],
+      lastAccessed: new Date(typeof d.lastAccessed === 'string' ? d.lastAccessed : Date.now()),
+      size: typeof d.size === 'number' ? d.size : 0,
+      ttl: typeof d.ttl === 'number' ? d.ttl : 0
+    };
+  }
+
+  private updatePerformanceMetricsFromStats(stats: any): void {
+    if (!stats) return;
+    this.performanceMetrics.totalQueries = stats.totalQueries ?? this.performanceMetrics.totalQueries;
+    this.performanceMetrics.cacheHits = stats.cacheHits ?? this.performanceMetrics.cacheHits;
+    this.performanceMetrics.cacheMisses = stats.cacheMisses ?? this.performanceMetrics.cacheMisses;
+    this.performanceMetrics.averageResponseTime = stats.averageResponseTime ?? this.performanceMetrics.averageResponseTime;
+    this.performanceMetrics.hitRate = stats.hitRate ?? this.performanceMetrics.hitRate;
+    this.performanceMetrics.memoryUsage = stats.memoryUsage ?? this.performanceMetrics.memoryUsage;
+    this.performanceMetrics.cacheSize = stats.cacheSize ?? this.performanceMetrics.cacheSize;
+    this.performanceMetrics.evictions = stats.evictions ?? this.performanceMetrics.evictions;
+    this.performanceMetrics.prewarmQueries = stats.prewarmQueries ?? this.performanceMetrics.prewarmQueries;
   }
 }
