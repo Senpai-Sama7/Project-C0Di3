@@ -9,9 +9,12 @@
 <p align="center">
   <img src="assets/cyber-agent-logo.jpg" alt="Cybersecurity AI Agent" width="300"/>
 </p>
----
-## Meet **"C0Di3"** Your computer personal body cybersecurity AI specialist 
----
+
+----
+
+### Meet **"C0Di3"** Your computer personal body cybersecurity AI specialist 
+
+----
 
 ## Table of Contents
 
