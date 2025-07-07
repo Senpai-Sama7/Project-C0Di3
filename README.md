@@ -39,7 +39,6 @@
 - [Future of Cybersecurity Intelligence](#the-future-of-cybersecurity-intelligence)
 - [Support & Evolution](#support--evolution)
 - [License](#license)
-- [Advanced/Stealth Mode Configuration](#advancedstealth-mode-configuration)
 
 ---
 
@@ -796,25 +795,6 @@ MIT License - see LICENSE file for details.
 ---
 
 *Core Agent: Where cybersecurity meets artificial intelligence, and your organization's security posture evolves beyond human limitations.*
-
-## Advanced/Stealth Mode Configuration
-
-For advanced users, stealth, or full-control mode, use the hidden `.gitsensei` file in your project root. This file is auto-loaded at startup and can contain any environment variables for advanced/stealth features (e.g., SENSEI_MODE, SENSEI_PASSWORD, ADVANCED_MODE, etc.).
-
-Example `.gitsensei`:
-```
-ADVANCED_MODE_ENABLED=true
-SENSEI_MODE_ENABLED=true
-SENSEI_BYPASS_ALL_RESTRICTIONS=true
-SENSEI_FULL_CONTROL=true
-SENSEI_NO_SIMULATION=true
-SENSEI_UNLIMITED_ACCESS=true
-SENSEI_PASSWORD_REQUIRED=true
-# SENSEI_DEFAULT_PASSWORD=your_password_here
-```
-
-- The file is not referenced in documentation or code comments for stealth.
-- All advanced features are enabled only if the correct environment variables are loaded (from `.gitsensei` or your shell).
 
 ---
 
