@@ -98,14 +98,18 @@ export class GeminiClient {
   }
 
   async embedText(text: string): Promise<number[]> {
-    try {
-      // For now, return a placeholder - implement actual embedding later
-      this.logger.debug('Embedding text:', text.substring(0, 50) + '...');
-      return new Array(768).fill(0).map(() => Math.random());
-    } catch (error) {
-      this.logger.error('Error embedding text:', error);
-      throw error;
-    }
+    // IMPORTANT: This is a placeholder and NOT a functional implementation.
+    // Gemini API might offer embedding capabilities through other model types (e.g., 'text-embedding-004')
+    // which would require a different setup.
+    const errorMessage = 'GeminiClient.embedText is not implemented. This method is a placeholder and does not generate real embeddings.';
+    this.logger.error(errorMessage);
+    console.error(`CRITICAL: ${errorMessage} Input text (first 50 chars): "${text.substring(0,50)}"`);
+    throw new Error(errorMessage);
+    // To implement this, you would typically use a specific embedding model from Gemini:
+    // Example (conceptual, check official Gemini SDK/API docs):
+    // const embeddingModel = this.genAI.getGenerativeModel({ model: "models/embedding-001" }); // Or appropriate model
+    // const result = await embeddingModel.embedContent(text);
+    // return result.embedding.values;
   }
 
   async generateContent(prompt: string, options?: any): Promise<any> {

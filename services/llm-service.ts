@@ -11,26 +11,71 @@ export class LLMService {
   private promptEnhancerUrl?: string;
   private timeout: number;
 
+import { Logger } from '../utils/logger'; // Import Logger
+
+export interface LLMServiceOptions {
+  apiUrl?: string;
+  promptEnhancerUrl?: string;
+  timeout?: number;
+}
+
+export class LLMService {
+  private apiUrl: string;
+  private promptEnhancerUrl?: string;
+  private timeout: number;
+  private logger: Logger;
+
   constructor(options: LLMServiceOptions = {}) {
-    this.apiUrl = options.apiUrl || process.env.LLM_API_URL || 'http://localhost:8000';
-    this.promptEnhancerUrl = options.promptEnhancerUrl;
+    this.logger = new Logger('LLMService');
+    const defaultApiUrl = 'http://localhost:8000'; // Llama.cpp default
+    const defaultPromptEnhancerUrl = 'http://localhost:5002/enhance'; // Example default
+
+    if (process.env.LLM_API_URL) {
+      this.apiUrl = process.env.LLM_API_URL;
+    } else if (options.apiUrl) {
+      this.apiUrl = options.apiUrl;
+    } else {
+      this.apiUrl = defaultApiUrl;
+      this.logger.warn(`LLM_API_URL not set, using default: ${this.apiUrl}. This is suitable for local development only.`);
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error('CRITICAL WARNING: Using default LLM_API_URL in production environment. This is insecure and likely incorrect.');
+      }
+    }
+
+    if (process.env.PROMPT_ENHANCER_URL) {
+      this.promptEnhancerUrl = process.env.PROMPT_ENHANCER_URL;
+    } else if (options.promptEnhancerUrl) {
+      this.promptEnhancerUrl = options.promptEnhancerUrl;
+    } else {
+      // Allowing promptEnhancerUrl to be undefined if not set, as it's optional.
+      // If you want a default even if not in env/options, set it here.
+      // this.promptEnhancerUrl = defaultPromptEnhancerUrl;
+      // this.logger.warn(`PROMPT_ENHANCER_URL not set, using default: ${this.promptEnhancerUrl}`);
+    }
+
     this.timeout = options.timeout || 15000;
+
+    this.logger.info(`LLMService initialized. API URL: ${this.apiUrl}, Prompt Enhancer URL: ${this.promptEnhancerUrl || 'Not configured'}`);
   }
 
   /**
-   * Enhance a prompt using an external Python microservice (stub for now)
+   * Enhance a prompt using an external Python microservice
    */
   async enhancePrompt(prompt: string, context?: any): Promise<string> {
-    if (!this.promptEnhancerUrl) return prompt;
+    if (!this.promptEnhancerUrl) {
+      this.logger.debug('Prompt enhancer URL not configured, returning original prompt.');
+      return prompt;
+    }
     try {
+      this.logger.debug(`Enhancing prompt via ${this.promptEnhancerUrl}`);
       const response = await axios.post(
         this.promptEnhancerUrl,
         { prompt, context },
         { timeout: this.timeout }
       );
       return response.data.enhanced || prompt;
-    } catch (err) {
-      // Fallback to original prompt on error
+    } catch (err: any) {
+      this.logger.error(`Error calling prompt enhancer service at ${this.promptEnhancerUrl}: ${err.message}. Falling back to original prompt.`);
       return prompt;
     }
   }

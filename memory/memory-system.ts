@@ -30,11 +30,18 @@ export class MemorySystem {
   private readonly logger: Logger;
   private readonly persistencePath: string;
   private initialized: boolean = false;
+  // TODO: Implement secure key management for memory encryption
+  private readonly encryptionKey: string | null = process.env.MEMORY_ENCRYPTION_KEY || null;
+
 
   constructor(options: MemorySystemOptions) {
     this.logger = new Logger('MemorySystem');
     this.eventBus = options.eventBus || new EventBus();
     this.persistencePath = options.persistencePath || './data/memory';
+
+    if (!this.encryptionKey) {
+      this.logger.warn('MEMORY_ENCRYPTION_KEY is not set. Persistent memory will not be encrypted. This is NOT secure for production.');
+    }
 
     // Initialize embedding service
     this.embeddingService = new EmbeddingService();
@@ -46,7 +53,8 @@ export class MemorySystem {
     this.memoryCache = new MemoryCache({
       maxSize: options.cacheSize || 10000,
       ttl: options.cacheTTL || 3600,
-      persistPath: path.join(this.persistencePath, 'cache')
+      persistPath: path.join(this.persistencePath, 'cache.json'), // Ensure a filename
+      encryptionKey: this.encryptionKey // Pass the encryption key
     });
 
     // Initialize memory subsystems
@@ -105,14 +113,21 @@ export class MemorySystem {
     }
 
     try {
-      await this.memoryCache.load();
+      await this.memoryCache.load(); // Assumes MemoryCache.load() is async
       this.logger.info('Memory cache loaded successfully.');
 
-      // Initialize other memory components
-      this.semanticMemory.clear();
-      this.episodicMemory.clear();
-      this.proceduralMemory.clear();
-      this.workingMemory.clear();
+      // Load other persistent memory components
+      await this.episodicMemory.load(path.join(this.persistencePath, 'episodic.json'));
+      await this.proceduralMemory.load(path.join(this.persistencePath, 'procedural.json'));
+      await this.conceptGraph.load(path.join(this.persistencePath, 'conceptGraph.json'));
+      // SemanticMemory is persisted via its VectorStore, so no direct load call here.
+
+      // Clear only if not successfully loaded or if intended
+      // For now, we assume load methods handle fresh start if file not found.
+      // this.semanticMemory.clear(); // Depends on VectorStore's clear behavior
+      // this.episodicMemory.clear(); // No, load will handle
+      // this.proceduralMemory.clear(); // No, load will handle
+      this.workingMemory.clear(); // Working memory is typically transient
 
       this.initialized = true;
       this.logger.info('Memory components initialized successfully.');
@@ -305,21 +320,24 @@ export class MemorySystem {
    */
   async persist(): Promise<void> {
     this.logger.info('Persisting memory to storage...');
-
-    await Promise.all([
-      this.memoryCache.persist(),
-    ]);
-
-    this.logger.info('Memory persistence completed');
+    try {
+      await Promise.all([
+        this.memoryCache.persist(), // Assumes MemoryCache.persist() is async
+        this.episodicMemory.persist(path.join(this.persistencePath, 'episodic.json')),
+        this.proceduralMemory.persist(path.join(this.persistencePath, 'procedural.json')),
+        this.conceptGraph.persist(path.join(this.persistencePath, 'conceptGraph.json')),
+        // SemanticMemory is persisted via its VectorStore.
+        // If VectorStore needs an explicit persist call, add it here. E.g., this.vectorStore.persist()
+      ]);
+      this.logger.info('Memory persistence process completed.');
+    } catch (error) {
+      this.logger.error('Failed during memory persistence:', error);
+    }
   }
 
   public async persistMemory(): Promise<void> {
-    try {
-      await this.memoryCache.persist();
-      this.logger.info('Memory cache persisted successfully.');
-    } catch (error) {
-      this.logger.error('Failed to persist memory cache:', error);
-    }
+    // This method is a duplicate of persist(). Consolidate in future refactor.
+    await this.persist();
   }
 
   /**

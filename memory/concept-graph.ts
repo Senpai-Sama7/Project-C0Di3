@@ -53,4 +53,30 @@ export class ConceptGraph {
     }
     return undefined;
   }
+
+  async load(filePath: string): Promise<void> {
+    // TODO: Implement actual loading logic from filePath
+    // Example:
+    // if (fs.existsSync(filePath)) {
+    //   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    //   this.nodes = new Map(Object.entries(data.nodes || {}));
+    //   this.edges = new Map(Object.entries(data.edges || {}));
+    //   console.log(`ConceptGraph loaded from ${filePath}`);
+    // } else {
+    //   console.log(`ConceptGraph: No persistence file found at ${filePath}. Starting fresh.`);
+    // }
+    console.warn(`ConceptGraph.load() called with ${filePath}, but not implemented.`);
+  }
+
+  async persist(filePath: string): Promise<void> {
+    // TODO: Implement actual persistence logic to filePath
+    // Example:
+    // const data = {
+    //   nodes: Object.fromEntries(this.nodes),
+    //   edges: Object.fromEntries(this.edges),
+    // };
+    // fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    // console.log(`ConceptGraph persisted to ${filePath}`);
+    console.warn(`ConceptGraph.persist() called with ${filePath}, but not implemented.`);
+  }
 }

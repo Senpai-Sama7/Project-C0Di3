@@ -43,8 +43,14 @@ try {
 }
 
 // Production configuration
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET environment variable is not set. Application cannot start.');
+  process.exit(1);
+}
+
 const PRODUCTION_CONFIG = {
-  jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
+  jwtSecret: JWT_SECRET,
   jwtExpiration: 24 * 60 * 60, // 24 hours
   maxFailedAttempts: 5,
   lockoutDuration: 30, // 30 minutes
@@ -77,25 +83,11 @@ class EnhancedCLI {
     console.log('🔧 Technical shortcuts available for power users');
     console.log('');
 
-    // Check if running in advanced mode
-    const isAdvancedMode = process.env.ADVANCED_MODE === 'true' ||
-                          process.env.SENSEI_MODE === 'true';
-
-    if (isAdvancedMode) {
-      console.log('🔮 Advanced Mode Detected');
-      console.log('Bypassing authentication for advanced operations');
-      console.log('');
-      this.isAuthenticated = true;
-      this.currentUser = {
-        id: 'advanced',
-        username: 'advanced',
-        role: 'admin',
-        permissions: [{ resource: '*', action: '*' }]
-      };
-    } else {
-      // Check for quick authentication via environment
-      if (process.env.CORE_USER && process.env.CORE_PASS) {
-        const authResult = await this.authService.authenticate(
+    // Check for quick authentication via environment
+    // Note: Advanced/Sensei mode authentication bypass has been removed.
+    // Specific privileged operations should require explicit authentication if needed.
+    if (process.env.CORE_USER && process.env.CORE_PASS) {
+      const authResult = await this.authService.authenticate(
           process.env.CORE_USER,
           process.env.CORE_PASS
         );

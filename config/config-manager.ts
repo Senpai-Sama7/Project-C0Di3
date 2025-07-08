@@ -142,30 +142,32 @@ export class ConfigManager {
     // Hash the password using a simple but effective method
     const crypto = require('crypto');
     this.advancedPasswordHash = crypto.createHash('sha256').update(password).digest('hex');
+    // console.log(`Sensei password hash set (debug only, remove for prod): ${this.advancedPasswordHash}`); // For debugging
   }
 
-  authenticateSensei(password: string): boolean {
+  authenticateSensei(passwordToAuthenticate: string): boolean {
+    const configuredSenseiPassword = process.env.SENSEI_PASSWORD;
+
+    if (!configuredSenseiPassword) {
+      console.warn('SENSEI_PASSWORD environment variable is not set. Sensei mode authentication is not possible.');
+      return false;
+    }
+
+    // If advancedPasswordHash is not set yet, set it from the env var for the first auth attempt.
     if (!this.advancedPasswordHash) {
-      // Use environment variable or generate from system entropy
-      const envPassword = process.env.SENSEI_PASSWORD || process.env.SENSEI_DEFAULT_PASSWORD;
-      if (envPassword) {
-        this.setSenseiPassword(envPassword);
-      } else {
-        // Generate from system entropy if no environment variable
-        const crypto = require('crypto');
-        const entropy = crypto.randomBytes(32).toString('hex');
-        this.setSenseiPassword(entropy);
-      }
+        this.setSenseiPassword(configuredSenseiPassword);
     }
 
     const crypto = require('crypto');
-    const inputHash = crypto.createHash('sha256').update(password).digest('hex');
+    const inputHash = crypto.createHash('sha256').update(passwordToAuthenticate).digest('hex');
 
     if (inputHash === this.advancedPasswordHash) {
       this.advancedAuthenticated = true;
+      console.log('Sensei mode authentication successful.');
       return true;
     }
 
+    console.warn('Sensei mode authentication failed.');
     return false;
   }
 
