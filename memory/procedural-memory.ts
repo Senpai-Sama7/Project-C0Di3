@@ -48,4 +48,28 @@ export class ProceduralMemory implements IMemory {
     }
     this.procedures.set(key, newProcedure);
   }
+
+  async load(filePath: string): Promise<void> {
+    // TODO: Implement actual loading logic. Serializing/deserializing functions is complex.
+    // May need to store function code as strings or use a dedicated procedure definition format.
+    // Example (conceptual, for simple stringified functions):
+    // if (fs.existsSync(filePath)) {
+    //   const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    //   this.procedures = new Map(Object.entries(data.procedures).map(([k, v_str]: [string, string]) => [k, new Function('return ' + v_str)()]) );
+    //   console.log(`ProceduralMemory loaded from ${filePath}`);
+    // } else {
+    //   console.log(`ProceduralMemory: No persistence file found at ${filePath}. Starting fresh.`);
+    // }
+    console.warn(`ProceduralMemory.load() called with ${filePath}, but not implemented due to complexity of function serialization.`);
+  }
+
+  async persist(filePath: string): Promise<void> {
+    // TODO: Implement actual persistence logic. See note in load() about function serialization.
+    // Example (conceptual, for simple stringified functions):
+    // const serializableProcedures = {};
+    // this.procedures.forEach((func, key) => { serializableProcedures[key] = func.toString(); });
+    // fs.writeFileSync(filePath, JSON.stringify({ procedures: serializableProcedures }, null, 2));
+    // console.log(`ProceduralMemory persisted to ${filePath}`);
+    console.warn(`ProceduralMemory.persist() called with ${filePath}, but not implemented due to complexity of function serialization.`);
+  }
 }
