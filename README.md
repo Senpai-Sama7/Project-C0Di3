@@ -25,7 +25,7 @@
 - [Comprehensive Feature Set](#comprehensive-feature-set)
 - [AI Thought Process & Architecture](#ai-thought-process--architecture)
 - [The Core Agent Advantage](#the-core-agent-advantage)
-- [Quick Start](#quick-start-from-zero-to-protected)
+- [FREE EARLY ACCESS](#get-early-access-for-free)
 - [Natural Language Interface](#natural-language-interface)
 - [Technical Shortcuts](#technical-shortcuts)
 - [Technology Behind the Magic](#the-technology-behind-the-magic)
@@ -349,18 +349,9 @@ core cag:benchmark queries.json
 
 ---
 
-## Quick Start: From Zero to Protected
+## GET EARLY ACCESS FOR FREE
 
-```bash
-# The 30-second setup that changes everything
-git clone <repo-url>
-cd core
-bash scripts/terms.sh
-./start-services.sh
-
-# Start the natural language interface
-core
-```
+https://senpai-sama7.github.io/C0Di3/
 
 *That's it. Your cybersecurity evolution begins now.*
 
