@@ -720,43 +720,7 @@ core --debug-mode
 
 ## Installation & Setup
 
-### **Quick Installation**
-```bash
-# Clone and setup
-git clone <repo-url>
-cd core-agent
-bash scripts/terms.sh
-
-# Start services
-./start-services.sh
-
-# Launch interface
-core
-```
-
-### **Production Deployment**
-```bash
-# Full production setup
-bash scripts/deploy-production.sh
-
-# Verify installation
-bash scripts/test-production.sh
-
-# Start with authentication
-core
-```
-
-### **Development Setup**
-```bash
-# Install dependencies
-npm install
-
-# Start development mode
-npm run dev
-
-# Run tests
-npm test
-```
+# **COMING SOON ...**
 
 ---
 
