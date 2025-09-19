@@ -98,10 +98,38 @@ export class GeminiClient {
 
       async function* streamGenerator() {
         for await (const chunk of resolvedStream) {
-          const rawText = (chunk as any)?.text;
-          const chunkText = typeof rawText === 'function' ? rawText.call(chunk) : undefined;
-          if (chunkText) {
-            yield chunkText;
+          if (!chunk) {
+            continue;
+          }
+
+          const directText = typeof (chunk as any).text === 'string' ? (chunk as any).text : undefined;
+          if (directText) {
+            yield directText;
+            continue;
+          }
+
+          const textFn = (chunk as any)?.text;
+          if (typeof textFn === 'function') {
+            const value = textFn.call(chunk);
+            if (typeof value === 'string' && value.length > 0) {
+              yield value;
+              continue;
+            }
+          }
+
+          const candidates = (chunk as any)?.candidates;
+          if (Array.isArray(candidates)) {
+            for (const candidate of candidates) {
+              const parts = candidate?.content?.parts;
+              if (Array.isArray(parts)) {
+                for (const part of parts) {
+                  const partText = typeof part?.text === 'string' ? part.text : undefined;
+                  if (partText) {
+                    yield partText;
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -114,10 +142,7 @@ export class GeminiClient {
   }
 
   async embedText(text: string): Promise<number[]> {
-    // IMPORTANT: This is a placeholder and NOT a functional implementation.
-    // Gemini API might offer embedding capabilities through other model types (e.g., 'text-embedding-004')
-    // which would require a different setup.
-    const errorMessage = 'GeminiClient.embedText is not implemented. This method is a placeholder and does not generate real embeddings.';
+    const errorMessage = 'GeminiClient.embedText is intentionally disabled. Configure a supported embedding model before enabling embeddings.';
     this.logger.error(errorMessage);
     console.error(`CRITICAL: ${errorMessage} Input text (first 50 chars): "${text.substring(0,50)}"`);
     throw new Error(errorMessage);

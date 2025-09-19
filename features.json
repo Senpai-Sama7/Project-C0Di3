@@ -33,6 +33,14 @@
   },
   {
     "id": "F5",
+    "feature": "Legacy user records without hashes migrate automatically",
+    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "expected": "auth-legacy-migration.outcome.migratedLogin === true && !auth-legacy-migration.outcome.retainedPlaintext",
+    "evidence": "evidence/auth-check.json",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F6",
     "feature": "TypeScript project builds without syntax errors",
     "command": "npm run build",
     "expected": "tsc exits 0",

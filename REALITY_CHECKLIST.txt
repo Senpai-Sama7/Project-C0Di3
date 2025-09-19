@@ -2,4 +2,5 @@
 - [x] F2 auth-reject-bad-password — VERIFIED (invalid password rejected)
 - [x] F3 auth-signed-jwt — VERIFIED (tampered token rejected while valid token passes)
 - [x] F4 auth-stored-hash — VERIFIED (credential store persists salted hash and salt only)
-- [x] F5 npm-build — VERIFIED (npm run build exits 0)
+- [x] F5 auth-legacy-migration — VERIFIED (legacy records without hashes load and trigger forced reset warnings)
+- [x] F6 npm-build — VERIFIED (npm run build exits 0)

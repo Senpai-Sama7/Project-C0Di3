@@ -95,6 +95,8 @@ export class AuthService {
   private sessions: Map<string, Session> = new Map();
   private auditLogs: AuditLog[] = [];
 
+  private readonly legacyCredentialWarnings = new Set<string>();
+
   private readonly auditLogFile: string;
   private readonly usersFile: string;
   private readonly sessionsFile: string;
@@ -583,21 +585,30 @@ export class AuthService {
   }
 
   private loadUsers(): void {
+    let migrationPerformed = false;
+
     try {
       if (fs.existsSync(this.usersFile)) {
         const data = fs.readFileSync(this.usersFile, 'utf8');
         const usersData = JSON.parse(data);
 
         for (const userData of usersData) {
-          const user: StoredUser = {
+          let user: StoredUser = {
             ...userData,
             createdAt: new Date(userData.createdAt),
             lastLogin: new Date(userData.lastLogin),
-            lockedUntil: userData.lockedUntil ? new Date(userData.lockedUntil) : undefined
+            lockedUntil: userData.lockedUntil ? new Date(userData.lockedUntil) : undefined,
+            failedLoginAttempts: userData.failedLoginAttempts ?? 0
           };
 
           if (!user.passwordHash || !user.passwordSalt) {
-            throw new Error(`User ${user.username} is missing password credentials. Please reset their password.`);
+            const migrated = this.migrateLegacyUserCredentials(user, userData);
+            if (migrated) {
+              user = migrated.user;
+              migrationPerformed = migrationPerformed || migrated.persist;
+            } else {
+              throw new Error(`User ${user.username} is missing password credentials. Please reset their password.`);
+            }
           }
           this.users.set(user.id, user);
         }
@@ -609,6 +620,65 @@ export class AuthService {
       this.logger.error('Failed to load users', error);
       throw error;
     }
+
+    if (migrationPerformed) {
+      this.logger.warn('Legacy user credentials migrated. Prompt users to rotate passwords immediately.');
+      this.saveUsers();
+    }
+  }
+
+  private migrateLegacyUserCredentials(
+    user: StoredUser,
+    rawUser: Record<string, any>
+  ): { user: StoredUser; persist: boolean } | null {
+    const resolution = this.resolveLegacyPassword(rawUser);
+
+    if (!resolution) {
+      return null;
+    }
+
+    const { password, source } = resolution;
+    const { password: _legacyPassword, ...rest } = user as Record<string, any>;
+    const { hash, salt } = this.hashPassword(password);
+    const migratedUser: StoredUser = {
+      ...(rest as StoredUser),
+      passwordHash: hash,
+      passwordSalt: salt,
+      failedLoginAttempts: 0
+    };
+
+    const warningKey = user.username || user.id;
+    if (warningKey && !this.legacyCredentialWarnings.has(warningKey)) {
+      this.legacyCredentialWarnings.add(warningKey);
+      this.logger.warn(
+        `Migrated legacy credentials for user ${user.username}. Source=${source}. Force a password reset immediately.`
+      );
+    }
+
+    return { user: migratedUser, persist: true };
+  }
+
+  private resolveLegacyPassword(rawUser: Record<string, any>): { password: string; source: string } | null {
+    const username = typeof rawUser.username === 'string' ? rawUser.username : undefined;
+
+    if (username) {
+      const envKey = `LEGACY_PASSWORD_${username.toUpperCase()}`;
+      const envPassword = process.env[envKey];
+      if (envPassword && envPassword.length >= this.config.passwordMinLength) {
+        return { password: envPassword, source: `env:${envKey}` };
+      }
+    }
+
+    if (typeof rawUser.password === 'string' && rawUser.password.length >= this.config.passwordMinLength) {
+      return { password: rawUser.password, source: 'stored-plaintext' };
+    }
+
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (username === 'admin' && adminPassword && adminPassword.length >= this.config.passwordMinLength) {
+      return { password: adminPassword, source: 'env:ADMIN_PASSWORD' };
+    }
+
+    return null;
   }
 
   private createDefaultUsers(): void {

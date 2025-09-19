@@ -51,6 +51,19 @@ async function main(): Promise<CheckResult[]> {
     fs.readFileSync(path.join(tmpDir, 'data', 'auth', 'users.json'), 'utf8')
   )[0];
 
+  const legacyUsersPath = path.join(tmpDir, 'data', 'auth', 'users.json');
+  const legacyUsers = JSON.parse(fs.readFileSync(legacyUsersPath, 'utf8'));
+  const legacyAdmin = { ...legacyUsers[0] };
+  delete legacyAdmin.passwordHash;
+  delete legacyAdmin.passwordSalt;
+  legacyAdmin.password = 'password';
+  fs.writeFileSync(legacyUsersPath, JSON.stringify([legacyAdmin], null, 2));
+
+  const legacyAuth = new AuthService(new EventBus(), config);
+  const migratedLogin = await legacyAuth.authenticate('admin', 'password');
+
+  const migratedRecord = JSON.parse(fs.readFileSync(legacyUsersPath, 'utf8'))[0];
+
   return [
     {
       id: 'auth-admin-login',
@@ -89,6 +102,16 @@ async function main(): Promise<CheckResult[]> {
       outcome: {
         tmpDir,
         files: fs.readdirSync(path.join(tmpDir, 'data', 'auth'))
+      }
+    },
+    {
+      id: 'auth-legacy-migration',
+      description: 'Legacy user records missing hashes are auto-migrated with warnings',
+      outcome: {
+        migratedLogin: migratedLogin.success,
+        storedHash: Boolean(migratedRecord.passwordHash),
+        storedSalt: Boolean(migratedRecord.passwordSalt),
+        retainedPlaintext: Object.prototype.hasOwnProperty.call(migratedRecord, 'password')
       }
     }
   ];

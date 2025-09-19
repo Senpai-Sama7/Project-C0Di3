@@ -1,0 +1,3 @@
+# Dependencies required for linting Python services in CI
+-r services/log-analyzer/requirements.txt
+pylint==3.3.8
