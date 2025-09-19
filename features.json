@@ -1,0 +1,42 @@
+[
+  {
+    "id": "F1",
+    "feature": "Admin authentication uses configured password",
+    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "expected": "auth-admin-login.outcome.success === true",
+    "evidence": "evidence/auth-check.json",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F2",
+    "feature": "Invalid password attempts are rejected",
+    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "expected": "auth-reject-bad-password.outcome.success === false",
+    "evidence": "evidence/auth-check.json",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F3",
+    "feature": "JWTs are signed and tamper-evident",
+    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "expected": "auth-signed-jwt.outcome.tamperedResult.error === 'Invalid token signature'",
+    "evidence": "evidence/auth-check.json",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F4",
+    "feature": "Credential store persists salted password hash",
+    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "expected": "auth-stored-hash.outcome.passwordHash && auth-stored-hash.outcome.passwordSalt",
+    "evidence": "evidence/auth-check.json",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F5",
+    "feature": "TypeScript project builds without syntax errors",
+    "command": "npm run build",
+    "expected": "tsc exits 0",
+    "evidence": "evidence/npm-build.log",
+    "status": "UNVERIFIED"
+  }
+]

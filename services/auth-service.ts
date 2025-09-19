@@ -3,6 +3,7 @@ import { Logger } from '../utils/logger';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
 export interface User {
   id: string;
@@ -77,6 +78,14 @@ export interface AuthConfig {
   auditLogRetention: number; // in days
 }
 
+interface TokenPayload {
+  sessionId: string;
+  userId: string;
+  username: string;
+  iat: number;
+  exp: number;
+}
+
 export class AuthService {
   private readonly eventBus: EventBus;
   private readonly logger: Logger;
@@ -116,7 +125,12 @@ export class AuthService {
   /**
    * Authenticate user with username/password
    */
-  async authenticate(username: string, password: string, ipAddress?: string, userAgent?: string): Promise<{ success: boolean; token?: string; user?: User; error?: string }> {
+  async authenticate(
+    username: string,
+    password: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<{ success: boolean; token?: string; session?: Session; user?: User; error?: string }> {
     const startTime = Date.now();
     const sessionId = this.generateSessionId();
 
@@ -211,7 +225,12 @@ export class AuthService {
         duration: Date.now() - startTime
       });
 
-      return { success: true, token, user: this.toPublicUser(user) };
+      return {
+        success: true,
+        token,
+        session: this.cloneSession(session),
+        user: this.toPublicUser(user)
+      };
 
     } catch (error) {
       this.logger.error('Authentication error', error);
@@ -257,9 +276,21 @@ export class AuthService {
       this.saveSessions();
 
       const user = this.users.get(session.userId);
-      return { valid: true, session, user: user ? this.toPublicUser(user) : undefined };
+      return {
+        valid: true,
+        session: this.cloneSession(session),
+        user: user ? this.toPublicUser(user) : undefined
+      };
 
     } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        return { valid: false, error: 'Token expired' };
+      }
+
+      if (error instanceof JsonWebTokenError) {
+        return { valid: false, error: 'Invalid token signature' };
+      }
+
       return { valid: false, error: 'Invalid token' };
     }
   }
@@ -683,7 +714,20 @@ export class AuthService {
 
   private toPublicUser(user: StoredUser): User {
     const { passwordHash: _hash, passwordSalt: _salt, ...publicUser } = user;
-    return publicUser;
+    return {
+      ...publicUser,
+      createdAt: new Date(publicUser.createdAt),
+      lastLogin: new Date(publicUser.lastLogin),
+      lockedUntil: publicUser.lockedUntil ? new Date(publicUser.lockedUntil) : undefined
+    };
+  }
+
+  private cloneSession(session: Session): Session {
+    return {
+      ...session,
+      createdAt: new Date(session.createdAt),
+      lastActivity: new Date(session.lastActivity)
+    };
   }
 
   private createSession(user: StoredUser, ipAddress?: string, userAgent?: string): Session {
@@ -706,30 +750,31 @@ export class AuthService {
   }
 
   private generateJWT(session: Session): string {
-    const payload = {
+    const payload: Omit<TokenPayload, 'iat' | 'exp'> = {
       sessionId: session.id,
       userId: session.userId,
-      username: session.username,
-      exp: Math.floor(Date.now() / 1000) + this.config.jwtExpiration
+      username: session.username
     };
 
-    // In a real implementation, you would use a proper JWT library
-    // For now, we'll create a simple token
-    return Buffer.from(JSON.stringify(payload)).toString('base64');
+    return jwt.sign(payload, this.config.jwtSecret, {
+      expiresIn: this.config.jwtExpiration
+    });
   }
 
-  private verifyJWT(token: string): any {
-    try {
-      const payload = JSON.parse(Buffer.from(token, 'base64').toString());
+  private verifyJWT(token: string): TokenPayload {
+    const decoded = jwt.verify(token, this.config.jwtSecret);
 
-      if (payload.exp < Math.floor(Date.now() / 1000)) {
-        throw new Error('Token expired');
-      }
-
-      return payload;
-    } catch (error) {
-      throw new Error('Invalid token');
+    if (typeof decoded === 'string') {
+      throw new JsonWebTokenError('Invalid token payload');
     }
+
+    const payload = decoded as TokenPayload;
+
+    if (!payload.sessionId || !payload.userId || !payload.username) {
+      throw new JsonWebTokenError('Token payload missing required claims');
+    }
+
+    return payload;
   }
 
   private generateSessionId(): string {
