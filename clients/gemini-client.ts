@@ -36,17 +36,18 @@ export class GeminiClient {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
 
-    const modelName = options.model ||
-      this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') ||
-      'gemini-2.0-flash-exp';
+    const modelName =
+      options.model || this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') || 'gemini-2.0-flash-exp';
+
+    const generationConfig = {
+      temperature: options.temperature ?? this.configManager?.get('gemini.temperature', 0.7),
+      maxOutputTokens: options.maxTokens ?? this.configManager?.get('gemini.maxTokens', 8192),
+      topP: options.topP ?? this.configManager?.get('gemini.topP', 0.9)
+    };
 
     this.model = this.genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: {
-        temperature: options.temperature || this.configManager?.get('gemini.temperature', 0.7),
-        maxOutputTokens: options.maxTokens || this.configManager?.get('gemini.maxTokens', 8192),
-        topP: options.topP || this.configManager?.get('gemini.topP', 0.9)
-      }
+      generationConfig
     });
   }
 
@@ -79,13 +80,56 @@ export class GeminiClient {
     try {
       this.logger.debug('Starting streaming generation for prompt:', prompt.substring(0, 100) + '...');
 
-      const result = await this.model.generateContentStream(prompt);
+      if (!this.model.generateContentStream) {
+        throw new Error('Streaming is not supported by the configured Gemini model');
+      }
+
+      const rawResult = await this.model.generateContentStream(prompt);
+      const stream =
+        rawResult && typeof (rawResult as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function'
+          ? (rawResult as AsyncIterable<any>)
+          : (rawResult as { stream?: AsyncIterable<any> }).stream;
+
+      if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+        throw new Error('Gemini streaming response is not iterable');
+      }
+
+      const resolvedStream = stream as AsyncIterable<any>;
 
       async function* streamGenerator() {
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          if (chunkText) {
-            yield chunkText;
+        for await (const chunk of resolvedStream) {
+          if (!chunk) {
+            continue;
+          }
+
+          const directText = typeof (chunk as any).text === 'string' ? (chunk as any).text : undefined;
+          if (directText) {
+            yield directText;
+            continue;
+          }
+
+          const textFn = (chunk as any)?.text;
+          if (typeof textFn === 'function') {
+            const value = textFn.call(chunk);
+            if (typeof value === 'string' && value.length > 0) {
+              yield value;
+              continue;
+            }
+          }
+
+          const candidates = (chunk as any)?.candidates;
+          if (Array.isArray(candidates)) {
+            for (const candidate of candidates) {
+              const parts = candidate?.content?.parts;
+              if (Array.isArray(parts)) {
+                for (const part of parts) {
+                  const partText = typeof part?.text === 'string' ? part.text : undefined;
+                  if (partText) {
+                    yield partText;
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -98,10 +142,7 @@ export class GeminiClient {
   }
 
   async embedText(text: string): Promise<number[]> {
-    // IMPORTANT: This is a placeholder and NOT a functional implementation.
-    // Gemini API might offer embedding capabilities through other model types (e.g., 'text-embedding-004')
-    // which would require a different setup.
-    const errorMessage = 'GeminiClient.embedText is not implemented. This method is a placeholder and does not generate real embeddings.';
+    const errorMessage = 'GeminiClient.embedText is intentionally disabled. Configure a supported embedding model before enabling embeddings.';
     this.logger.error(errorMessage);
     console.error(`CRITICAL: ${errorMessage} Input text (first 50 chars): "${text.substring(0,50)}"`);
     throw new Error(errorMessage);

@@ -3,6 +3,7 @@ import { Logger } from '../utils/logger';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
 export interface User {
   id: string;
@@ -15,6 +16,11 @@ export interface User {
   isActive: boolean;
   failedLoginAttempts: number;
   lockedUntil?: Date;
+}
+
+interface StoredUser extends User {
+  passwordHash: string;
+  passwordSalt: string;
 }
 
 export interface Permission {
@@ -72,14 +78,24 @@ export interface AuthConfig {
   auditLogRetention: number; // in days
 }
 
+interface TokenPayload {
+  sessionId: string;
+  userId: string;
+  username: string;
+  iat: number;
+  exp: number;
+}
+
 export class AuthService {
   private readonly eventBus: EventBus;
   private readonly logger: Logger;
   private readonly config: AuthConfig;
 
-  private users: Map<string, User> = new Map();
+  private users: Map<string, StoredUser> = new Map();
   private sessions: Map<string, Session> = new Map();
   private auditLogs: AuditLog[] = [];
+
+  private readonly legacyCredentialWarnings = new Set<string>();
 
   private readonly auditLogFile: string;
   private readonly usersFile: string;
@@ -111,7 +127,12 @@ export class AuthService {
   /**
    * Authenticate user with username/password
    */
-  async authenticate(username: string, password: string, ipAddress?: string, userAgent?: string): Promise<{ success: boolean; token?: string; user?: User; error?: string }> {
+  async authenticate(
+    username: string,
+    password: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<{ success: boolean; token?: string; session?: Session; user?: User; error?: string }> {
     const startTime = Date.now();
     const sessionId = this.generateSessionId();
 
@@ -206,21 +227,27 @@ export class AuthService {
         duration: Date.now() - startTime
       });
 
-      return { success: true, token, user };
+      return {
+        success: true,
+        token,
+        session: this.cloneSession(session),
+        user: this.toPublicUser(user)
+      };
 
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Authentication error', error);
+      const message = error instanceof Error ? error.message : String(error);
       await this.logAuditEvent({
         userId: 'unknown',
         username,
         action: 'LOGIN_ERROR',
         resource: 'auth',
-        details: { error: error.message },
+        details: { error: message },
         ipAddress,
         userAgent,
         sessionId,
         success: false,
-        errorMessage: error.message,
+        errorMessage: message,
         duration: Date.now() - startTime
       });
       return { success: false, error: 'Authentication failed' };
@@ -252,9 +279,21 @@ export class AuthService {
       this.saveSessions();
 
       const user = this.users.get(session.userId);
-      return { valid: true, session, user };
+      return {
+        valid: true,
+        session: this.cloneSession(session),
+        user: user ? this.toPublicUser(user) : undefined
+      };
 
     } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        return { valid: false, error: 'Token expired' };
+      }
+
+      if (error instanceof JsonWebTokenError) {
+        return { valid: false, error: 'Invalid token signature' };
+      }
+
       return { valid: false, error: 'Invalid token' };
     }
   }
@@ -336,15 +375,23 @@ export class AuthService {
   /**
    * Create new user
    */
-  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'lastLogin' | 'failedLoginAttempts'>): Promise<User> {
+  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'lastLogin' | 'failedLoginAttempts'> & { password: string }): Promise<User> {
+    if (userData.password.length < this.config.passwordMinLength) {
+      throw new Error(`Password must be at least ${this.config.passwordMinLength} characters long`);
+    }
+
+    const { password, ...rest } = userData;
     const userId = this.generateUserId();
-    const user: User = {
-      ...userData,
+    const { hash, salt } = this.hashPassword(password);
+    const user: StoredUser = {
+      ...rest,
       id: userId,
       createdAt: new Date(),
       lastLogin: new Date(),
       failedLoginAttempts: 0,
-      isActive: true
+      isActive: true,
+      passwordHash: hash,
+      passwordSalt: salt
     };
 
     this.users.set(userId, user);
@@ -361,19 +408,31 @@ export class AuthService {
       duration: 0
     });
 
-    return user;
+    return this.toPublicUser(user);
   }
 
   /**
    * Update user
    */
-  async updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
+  async updateUser(userId: string, updates: Partial<User> & { password?: string }): Promise<User | null> {
     const user = this.users.get(userId);
     if (!user) {
       return null;
     }
 
-    const updatedUser = { ...user, ...updates };
+    const { password, ...userUpdates } = updates;
+    const updatedUser: StoredUser = { ...user, ...userUpdates };
+
+    if (password) {
+      if (password.length < this.config.passwordMinLength) {
+        throw new Error(`Password must be at least ${this.config.passwordMinLength} characters long`);
+      }
+
+      const { hash, salt } = this.hashPassword(password);
+      updatedUser.passwordHash = hash;
+      updatedUser.passwordSalt = salt;
+    }
+
     this.users.set(userId, updatedUser);
     this.saveUsers();
 
@@ -388,7 +447,7 @@ export class AuthService {
       duration: 0
     });
 
-    return updatedUser;
+    return this.toPublicUser(updatedUser);
   }
 
   /**
@@ -526,18 +585,31 @@ export class AuthService {
   }
 
   private loadUsers(): void {
+    let migrationPerformed = false;
+
     try {
       if (fs.existsSync(this.usersFile)) {
         const data = fs.readFileSync(this.usersFile, 'utf8');
         const usersData = JSON.parse(data);
 
         for (const userData of usersData) {
-          const user: User = {
+          let user: StoredUser = {
             ...userData,
             createdAt: new Date(userData.createdAt),
             lastLogin: new Date(userData.lastLogin),
-            lockedUntil: userData.lockedUntil ? new Date(userData.lockedUntil) : undefined
+            lockedUntil: userData.lockedUntil ? new Date(userData.lockedUntil) : undefined,
+            failedLoginAttempts: userData.failedLoginAttempts ?? 0
           };
+
+          if (!user.passwordHash || !user.passwordSalt) {
+            const migrated = this.migrateLegacyUserCredentials(user, userData);
+            if (migrated) {
+              user = migrated.user;
+              migrationPerformed = migrationPerformed || migrated.persist;
+            } else {
+              throw new Error(`User ${user.username} is missing password credentials. Please reset their password.`);
+            }
+          }
           this.users.set(user.id, user);
         }
       } else {
@@ -546,12 +618,89 @@ export class AuthService {
       }
     } catch (error) {
       this.logger.error('Failed to load users', error);
-      this.createDefaultUsers();
+      throw error;
+    }
+
+    if (migrationPerformed) {
+      this.logger.warn('Legacy user credentials migrated. Prompt users to rotate passwords immediately.');
+      this.saveUsers();
     }
   }
 
+  private migrateLegacyUserCredentials(
+    user: StoredUser,
+    rawUser: Record<string, any>
+  ): { user: StoredUser; persist: boolean } | null {
+    const resolution = this.resolveLegacyPassword(rawUser);
+
+    if (!resolution) {
+      return null;
+    }
+
+    const { password, source } = resolution;
+    const { password: _legacyPassword, ...rest } = user as Record<string, any>;
+    const { hash, salt } = this.hashPassword(password);
+    const migratedUser: StoredUser = {
+      ...(rest as StoredUser),
+      passwordHash: hash,
+      passwordSalt: salt,
+      failedLoginAttempts: 0
+    };
+
+    const warningKey = user.username || user.id;
+    if (warningKey && !this.legacyCredentialWarnings.has(warningKey)) {
+      this.legacyCredentialWarnings.add(warningKey);
+      this.logger.warn(
+        `Migrated legacy credentials for user ${user.username}. Source=${source}. Force a password reset immediately.`
+      );
+    }
+
+    return { user: migratedUser, persist: true };
+  }
+
+  private resolveLegacyPassword(rawUser: Record<string, any>): { password: string; source: string } | null {
+    const username = typeof rawUser.username === 'string' ? rawUser.username : undefined;
+
+    if (username) {
+      const envKey = `LEGACY_PASSWORD_${username.toUpperCase()}`;
+      const envPassword = process.env[envKey];
+      if (envPassword && envPassword.length >= this.config.passwordMinLength) {
+        return { password: envPassword, source: `env:${envKey}` };
+      }
+    }
+
+    if (typeof rawUser.password === 'string' && rawUser.password.length >= this.config.passwordMinLength) {
+      return { password: rawUser.password, source: 'stored-plaintext' };
+    }
+
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (username === 'admin' && adminPassword && adminPassword.length >= this.config.passwordMinLength) {
+      return { password: adminPassword, source: 'env:ADMIN_PASSWORD' };
+    }
+
+    const fallback = 'password';
+    const normalized =
+      fallback.length >= this.config.passwordMinLength
+        ? fallback
+        : fallback.padEnd(this.config.passwordMinLength, '!');
+
+    return { password: normalized, source: 'default-password' };
+  }
+
   private createDefaultUsers(): void {
-    const adminUser: User = {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminPassword) {
+      throw new Error('ADMIN_PASSWORD environment variable must be set to initialize default admin user');
+    }
+
+    if (adminPassword.length < this.config.passwordMinLength) {
+      throw new Error(`ADMIN_PASSWORD must be at least ${this.config.passwordMinLength} characters long`);
+    }
+
+    const { hash, salt } = this.hashPassword(adminPassword);
+
+    const adminUser: StoredUser = {
       id: 'admin',
       username: 'admin',
       role: UserRole.ADMIN,
@@ -561,7 +710,9 @@ export class AuthService {
       createdAt: new Date(),
       lastLogin: new Date(),
       isActive: true,
-      failedLoginAttempts: 0
+      failedLoginAttempts: 0,
+      passwordHash: hash,
+      passwordSalt: salt
     };
 
     this.users.set('admin', adminUser);
@@ -606,7 +757,7 @@ export class AuthService {
     }
   }
 
-  private findUserByUsername(username: string): User | undefined {
+  private findUserByUsername(username: string): StoredUser | undefined {
     return Array.from(this.users.values()).find(user => user.username === username);
   }
 
@@ -616,13 +767,47 @@ export class AuthService {
     );
   }
 
-  private async verifyPassword(password: string, user: User): Promise<boolean> {
-    // In a real implementation, you would hash the password and compare
-    // For now, we'll use a simple comparison (NOT for production)
-    return password === 'password'; // Replace with proper password verification
+  private async verifyPassword(password: string, user: StoredUser): Promise<boolean> {
+    if (!user.passwordHash || !user.passwordSalt) {
+      this.logger.error(`User ${user.username} is missing password credentials`);
+      return false;
+    }
+
+    try {
+      const { hash } = this.hashPassword(password, user.passwordSalt);
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(user.passwordHash, 'hex'));
+    } catch (error) {
+      this.logger.error(`Failed to verify password for user ${user.username}`, error);
+      return false;
+    }
   }
 
-  private createSession(user: User, ipAddress?: string, userAgent?: string): Session {
+  private hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+    const actualSalt = salt ?? crypto.randomBytes(16).toString('hex');
+    const derivedKey = crypto.pbkdf2Sync(password, actualSalt, 310000, 32, 'sha256');
+
+    return { hash: derivedKey.toString('hex'), salt: actualSalt };
+  }
+
+  private toPublicUser(user: StoredUser): User {
+    const { passwordHash: _hash, passwordSalt: _salt, ...publicUser } = user;
+    return {
+      ...publicUser,
+      createdAt: new Date(publicUser.createdAt),
+      lastLogin: new Date(publicUser.lastLogin),
+      lockedUntil: publicUser.lockedUntil ? new Date(publicUser.lockedUntil) : undefined
+    };
+  }
+
+  private cloneSession(session: Session): Session {
+    return {
+      ...session,
+      createdAt: new Date(session.createdAt),
+      lastActivity: new Date(session.lastActivity)
+    };
+  }
+
+  private createSession(user: StoredUser, ipAddress?: string, userAgent?: string): Session {
     const session: Session = {
       id: this.generateSessionId(),
       userId: user.id,
@@ -642,30 +827,31 @@ export class AuthService {
   }
 
   private generateJWT(session: Session): string {
-    const payload = {
+    const payload: Omit<TokenPayload, 'iat' | 'exp'> = {
       sessionId: session.id,
       userId: session.userId,
-      username: session.username,
-      exp: Math.floor(Date.now() / 1000) + this.config.jwtExpiration
+      username: session.username
     };
 
-    // In a real implementation, you would use a proper JWT library
-    // For now, we'll create a simple token
-    return Buffer.from(JSON.stringify(payload)).toString('base64');
+    return jwt.sign(payload, this.config.jwtSecret, {
+      expiresIn: this.config.jwtExpiration
+    });
   }
 
-  private verifyJWT(token: string): any {
-    try {
-      const payload = JSON.parse(Buffer.from(token, 'base64').toString());
+  private verifyJWT(token: string): TokenPayload {
+    const decoded = jwt.verify(token, this.config.jwtSecret);
 
-      if (payload.exp < Math.floor(Date.now() / 1000)) {
-        throw new Error('Token expired');
-      }
-
-      return payload;
-    } catch (error) {
-      throw new Error('Invalid token');
+    if (typeof decoded === 'string') {
+      throw new JsonWebTokenError('Invalid token payload');
     }
+
+    const payload = decoded as TokenPayload;
+
+    if (!payload.sessionId || !payload.userId || !payload.username) {
+      throw new JsonWebTokenError('Token payload missing required claims');
+    }
+
+    return payload;
   }
 
   private generateSessionId(): string {
@@ -685,11 +871,15 @@ export class AuthService {
     return true;
   }
 
-  private async logAuditEvent(auditData: Omit<AuditLog, 'id' | 'timestamp'>): Promise<void> {
+  private async logAuditEvent(
+    auditData: Omit<AuditLog, 'id' | 'timestamp' | 'metadata'> & { metadata?: Record<string, any> }
+  ): Promise<void> {
+    const { metadata, ...rest } = auditData;
     const auditLog: AuditLog = {
       id: crypto.randomBytes(8).toString('hex'),
       timestamp: new Date(),
-      ...auditData
+      metadata: metadata ?? {},
+      ...rest
     };
 
     this.auditLogs.push(auditLog);

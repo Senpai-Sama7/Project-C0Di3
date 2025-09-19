@@ -291,14 +291,15 @@ export class ShortcutService {
 
       return execution;
 
-    } catch (error) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       const execution: ShortcutExecution = {
         shortcut,
         args,
         result: null,
         executionTime: Date.now() - startTime,
         success: false,
-        error: error.message
+        error: message
       };
 
       this.logger.error(`Shortcut execution failed: ${shortcutName}`, error);

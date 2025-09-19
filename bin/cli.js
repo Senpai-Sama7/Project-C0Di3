@@ -10,11 +10,13 @@ if (fs.existsSync(gitsenseiPath)) {
 }
 
 require('dotenv/config');
+process.env.TS_NODE_PREFER_TS_EXTS = process.env.TS_NODE_PREFER_TS_EXTS || 'true';
 require('ts-node/register');
 const { GemmaAgent } = require('../gemma3n:4B-agent');
 const { ToolRegistry } = require('../tools/tool-registry');
 const readline = require('readline');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 // Import TypeScript modules (assuming they're compiled or using ts-node)
 let AuthService, AuthMiddleware, CAGService, EventBus, Logger, ShortcutService;
@@ -24,12 +26,12 @@ try {
   const tsNode = require('ts-node');
   tsNode.register();
 
-  const { AuthService: AuthServiceClass } = require('../services/auth-service');
-  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware');
-  const { CAGService: CAGServiceClass } = require('../services/cag-service');
-  const { EventBus: EventBusClass } = require('../events/event-bus');
-  const { Logger: LoggerClass } = require('../utils/logger');
-  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service');
+  const { AuthService: AuthServiceClass } = require('../services/auth-service.ts');
+  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware.ts');
+  const { CAGService: CAGServiceClass } = require('../services/cag-service.ts');
+  const { EventBus: EventBusClass } = require('../events/event-bus.ts');
+  const { Logger: LoggerClass } = require('../utils/logger.ts');
+  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service.ts');
 
   AuthService = AuthServiceClass;
   AuthMiddleware = AuthMiddlewareClass;
@@ -59,6 +61,44 @@ const PRODUCTION_CONFIG = {
   requireMFA: false,
   auditLogRetention: 90 // 90 days
 };
+
+function resolveAdminPassword(config) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  let adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    if (isProduction) {
+      console.error('FATAL ERROR: ADMIN_PASSWORD environment variable is not set. Application cannot start.');
+      process.exit(1);
+    }
+
+    const length = Math.max(config.passwordMinLength, 16);
+    adminPassword = crypto.randomBytes(length).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, length);
+    process.env.ADMIN_PASSWORD = adminPassword;
+
+    const authDir = path.join(process.cwd(), 'data', 'auth');
+    fs.mkdirSync(authDir, { recursive: true });
+    const passwordFile = path.join(authDir, 'bootstrap-admin-password.txt');
+    fs.writeFileSync(passwordFile, `${adminPassword}\n`, { mode: 0o600 });
+    console.warn(`[DEV ONLY] Generated admin password written to ${passwordFile}. Set ADMIN_PASSWORD to override.`);
+  }
+
+  if (process.env.ADMIN_PASSWORD.length < config.passwordMinLength) {
+    if (isProduction) {
+      console.error(`FATAL ERROR: ADMIN_PASSWORD must be at least ${config.passwordMinLength} characters long.`);
+      process.exit(1);
+    }
+
+    const length = Math.max(config.passwordMinLength, process.env.ADMIN_PASSWORD.length);
+    adminPassword = process.env.ADMIN_PASSWORD.padEnd(length, '!');
+    process.env.ADMIN_PASSWORD = adminPassword;
+    console.warn(`Adjusted ADMIN_PASSWORD length to meet minimum requirement (${config.passwordMinLength}).`);
+  }
+
+  return process.env.ADMIN_PASSWORD;
+}
+
+const ADMIN_PASSWORD = resolveAdminPassword(PRODUCTION_CONFIG);
 
 class EnhancedCLI {
   constructor() {
