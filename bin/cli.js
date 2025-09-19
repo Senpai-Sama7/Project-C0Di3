@@ -49,6 +49,8 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
 const PRODUCTION_CONFIG = {
   jwtSecret: JWT_SECRET,
   jwtExpiration: 24 * 60 * 60, // 24 hours
@@ -59,6 +61,16 @@ const PRODUCTION_CONFIG = {
   requireMFA: false,
   auditLogRetention: 90 // 90 days
 };
+
+if (!ADMIN_PASSWORD) {
+  console.error('FATAL ERROR: ADMIN_PASSWORD environment variable is not set. Application cannot start.');
+  process.exit(1);
+}
+
+if (ADMIN_PASSWORD.length < PRODUCTION_CONFIG.passwordMinLength) {
+  console.error(`FATAL ERROR: ADMIN_PASSWORD must be at least ${PRODUCTION_CONFIG.passwordMinLength} characters long.`);
+  process.exit(1);
+}
 
 class EnhancedCLI {
   constructor() {

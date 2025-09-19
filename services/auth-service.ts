@@ -17,6 +17,11 @@ export interface User {
   lockedUntil?: Date;
 }
 
+interface StoredUser extends User {
+  passwordHash: string;
+  passwordSalt: string;
+}
+
 export interface Permission {
   resource: string;
   action: string;
@@ -77,7 +82,7 @@ export class AuthService {
   private readonly logger: Logger;
   private readonly config: AuthConfig;
 
-  private users: Map<string, User> = new Map();
+  private users: Map<string, StoredUser> = new Map();
   private sessions: Map<string, Session> = new Map();
   private auditLogs: AuditLog[] = [];
 
@@ -206,7 +211,7 @@ export class AuthService {
         duration: Date.now() - startTime
       });
 
-      return { success: true, token, user };
+      return { success: true, token, user: this.toPublicUser(user) };
 
     } catch (error) {
       this.logger.error('Authentication error', error);
@@ -252,7 +257,7 @@ export class AuthService {
       this.saveSessions();
 
       const user = this.users.get(session.userId);
-      return { valid: true, session, user };
+      return { valid: true, session, user: user ? this.toPublicUser(user) : undefined };
 
     } catch (error) {
       return { valid: false, error: 'Invalid token' };
@@ -336,15 +341,23 @@ export class AuthService {
   /**
    * Create new user
    */
-  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'lastLogin' | 'failedLoginAttempts'>): Promise<User> {
+  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'lastLogin' | 'failedLoginAttempts'> & { password: string }): Promise<User> {
+    if (userData.password.length < this.config.passwordMinLength) {
+      throw new Error(`Password must be at least ${this.config.passwordMinLength} characters long`);
+    }
+
+    const { password, ...rest } = userData;
     const userId = this.generateUserId();
-    const user: User = {
-      ...userData,
+    const { hash, salt } = this.hashPassword(password);
+    const user: StoredUser = {
+      ...rest,
       id: userId,
       createdAt: new Date(),
       lastLogin: new Date(),
       failedLoginAttempts: 0,
-      isActive: true
+      isActive: true,
+      passwordHash: hash,
+      passwordSalt: salt
     };
 
     this.users.set(userId, user);
@@ -361,19 +374,31 @@ export class AuthService {
       duration: 0
     });
 
-    return user;
+    return this.toPublicUser(user);
   }
 
   /**
    * Update user
    */
-  async updateUser(userId: string, updates: Partial<User>): Promise<User | null> {
+  async updateUser(userId: string, updates: Partial<User> & { password?: string }): Promise<User | null> {
     const user = this.users.get(userId);
     if (!user) {
       return null;
     }
 
-    const updatedUser = { ...user, ...updates };
+    const { password, ...userUpdates } = updates;
+    const updatedUser: StoredUser = { ...user, ...userUpdates };
+
+    if (password) {
+      if (password.length < this.config.passwordMinLength) {
+        throw new Error(`Password must be at least ${this.config.passwordMinLength} characters long`);
+      }
+
+      const { hash, salt } = this.hashPassword(password);
+      updatedUser.passwordHash = hash;
+      updatedUser.passwordSalt = salt;
+    }
+
     this.users.set(userId, updatedUser);
     this.saveUsers();
 
@@ -388,7 +413,7 @@ export class AuthService {
       duration: 0
     });
 
-    return updatedUser;
+    return this.toPublicUser(updatedUser);
   }
 
   /**
@@ -532,12 +557,16 @@ export class AuthService {
         const usersData = JSON.parse(data);
 
         for (const userData of usersData) {
-          const user: User = {
+          const user: StoredUser = {
             ...userData,
             createdAt: new Date(userData.createdAt),
             lastLogin: new Date(userData.lastLogin),
             lockedUntil: userData.lockedUntil ? new Date(userData.lockedUntil) : undefined
           };
+
+          if (!user.passwordHash || !user.passwordSalt) {
+            throw new Error(`User ${user.username} is missing password credentials. Please reset their password.`);
+          }
           this.users.set(user.id, user);
         }
       } else {
@@ -546,12 +575,24 @@ export class AuthService {
       }
     } catch (error) {
       this.logger.error('Failed to load users', error);
-      this.createDefaultUsers();
+      throw error;
     }
   }
 
   private createDefaultUsers(): void {
-    const adminUser: User = {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminPassword) {
+      throw new Error('ADMIN_PASSWORD environment variable must be set to initialize default admin user');
+    }
+
+    if (adminPassword.length < this.config.passwordMinLength) {
+      throw new Error(`ADMIN_PASSWORD must be at least ${this.config.passwordMinLength} characters long`);
+    }
+
+    const { hash, salt } = this.hashPassword(adminPassword);
+
+    const adminUser: StoredUser = {
       id: 'admin',
       username: 'admin',
       role: UserRole.ADMIN,
@@ -561,7 +602,9 @@ export class AuthService {
       createdAt: new Date(),
       lastLogin: new Date(),
       isActive: true,
-      failedLoginAttempts: 0
+      failedLoginAttempts: 0,
+      passwordHash: hash,
+      passwordSalt: salt
     };
 
     this.users.set('admin', adminUser);
@@ -606,7 +649,7 @@ export class AuthService {
     }
   }
 
-  private findUserByUsername(username: string): User | undefined {
+  private findUserByUsername(username: string): StoredUser | undefined {
     return Array.from(this.users.values()).find(user => user.username === username);
   }
 
@@ -616,13 +659,34 @@ export class AuthService {
     );
   }
 
-  private async verifyPassword(password: string, user: User): Promise<boolean> {
-    // In a real implementation, you would hash the password and compare
-    // For now, we'll use a simple comparison (NOT for production)
-    return password === 'password'; // Replace with proper password verification
+  private async verifyPassword(password: string, user: StoredUser): Promise<boolean> {
+    if (!user.passwordHash || !user.passwordSalt) {
+      this.logger.error(`User ${user.username} is missing password credentials`);
+      return false;
+    }
+
+    try {
+      const { hash } = this.hashPassword(password, user.passwordSalt);
+      return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(user.passwordHash, 'hex'));
+    } catch (error) {
+      this.logger.error(`Failed to verify password for user ${user.username}`, error);
+      return false;
+    }
   }
 
-  private createSession(user: User, ipAddress?: string, userAgent?: string): Session {
+  private hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+    const actualSalt = salt ?? crypto.randomBytes(16).toString('hex');
+    const derivedKey = crypto.pbkdf2Sync(password, actualSalt, 310000, 32, 'sha256');
+
+    return { hash: derivedKey.toString('hex'), salt: actualSalt };
+  }
+
+  private toPublicUser(user: StoredUser): User {
+    const { passwordHash: _hash, passwordSalt: _salt, ...publicUser } = user;
+    return publicUser;
+  }
+
+  private createSession(user: StoredUser, ipAddress?: string, userAgent?: string): Session {
     const session: Session = {
       id: this.generateSessionId(),
       userId: user.id,
