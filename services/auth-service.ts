@@ -232,19 +232,20 @@ export class AuthService {
         user: this.toPublicUser(user)
       };
 
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Authentication error', error);
+      const message = error instanceof Error ? error.message : String(error);
       await this.logAuditEvent({
         userId: 'unknown',
         username,
         action: 'LOGIN_ERROR',
         resource: 'auth',
-        details: { error: error.message },
+        details: { error: message },
         ipAddress,
         userAgent,
         sessionId,
         success: false,
-        errorMessage: error.message,
+        errorMessage: message,
         duration: Date.now() - startTime
       });
       return { success: false, error: 'Authentication failed' };
@@ -794,11 +795,15 @@ export class AuthService {
     return true;
   }
 
-  private async logAuditEvent(auditData: Omit<AuditLog, 'id' | 'timestamp'>): Promise<void> {
+  private async logAuditEvent(
+    auditData: Omit<AuditLog, 'id' | 'timestamp' | 'metadata'> & { metadata?: Record<string, any> }
+  ): Promise<void> {
+    const { metadata, ...rest } = auditData;
     const auditLog: AuditLog = {
       id: crypto.randomBytes(8).toString('hex'),
       timestamp: new Date(),
-      ...auditData
+      metadata: metadata ?? {},
+      ...rest
     };
 
     this.auditLogs.push(auditLog);

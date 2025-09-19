@@ -3,4 +3,4 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 > core-agent@1.0.0 build
 > tsc
 
-services/llm-service.ts(14,1): error TS1068: Unexpected token. A constructor, method, accessor, or property was expected.
+

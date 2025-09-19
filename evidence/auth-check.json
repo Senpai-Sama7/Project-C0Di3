@@ -1,4 +1,5 @@
-[2025-09-19T08:20:49.542Z] [INFO] [AuthService] AuthService initialized
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+[2025-09-19T08:37:52.047Z] [INFO] [AuthService] AuthService initialized
 [
   {
     "id": "auth-admin-login",
@@ -25,11 +26,11 @@
       "validToken": {
         "valid": true,
         "session": {
-          "id": "b865894b7faa6fdb80e2c798ac992a1a",
+          "id": "5308c872cadff2088eba32a9cd5ee5e4",
           "userId": "admin",
           "username": "admin",
-          "createdAt": "2025-09-19T08:20:49.887Z",
-          "lastActivity": "2025-09-19T08:20:50.223Z",
+          "createdAt": "2025-09-19T08:37:52.136Z",
+          "lastActivity": "2025-09-19T08:37:52.228Z",
           "permissions": [
             {
               "resource": "*",
@@ -48,8 +49,8 @@
               "action": "*"
             }
           ],
-          "createdAt": "2025-09-19T08:20:49.540Z",
-          "lastLogin": "2025-09-19T08:20:49.886Z",
+          "createdAt": "2025-09-19T08:37:52.046Z",
+          "lastLogin": "2025-09-19T08:37:52.136Z",
           "isActive": true,
           "failedLoginAttempts": 1
         }
@@ -73,19 +74,19 @@
           "action": "*"
         }
       ],
-      "createdAt": "2025-09-19T08:20:49.540Z",
-      "lastLogin": "2025-09-19T08:20:49.886Z",
+      "createdAt": "2025-09-19T08:37:52.046Z",
+      "lastLogin": "2025-09-19T08:37:52.136Z",
       "isActive": true,
       "failedLoginAttempts": 1,
-      "passwordHash": "20f57f9e84d2e25c3945baa140be102d80e4cebf949f7dc9dafed56a70f6a406",
-      "passwordSalt": "ad55597f73c421848477daabec05fe69"
+      "passwordHash": "0c4271758a989dbe90a32229e083ea028e8d75c5db0da1c8e59dfb5a2eb446f8",
+      "passwordSalt": "a9a34a8ff00b8c5f1859b06942170550"
     }
   },
   {
     "id": "auth-context",
     "description": "Temporary directory used for this verification run",
     "outcome": {
-      "tmpDir": "/tmp/auth-reality-Gvlo3r",
+      "tmpDir": "/tmp/auth-reality-ZJwihM",
       "files": [
         "sessions.json",
         "users.json"

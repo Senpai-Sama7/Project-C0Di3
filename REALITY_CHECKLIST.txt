@@ -2,4 +2,4 @@
 - [x] F2 auth-reject-bad-password — VERIFIED (invalid password rejected)
 - [x] F3 auth-signed-jwt — VERIFIED (tampered token rejected while valid token passes)
 - [x] F4 auth-stored-hash — VERIFIED (credential store persists salted hash and salt only)
-- [ ] F5 npm-build — UNVERIFIED (TypeScript build still fails in services/llm-service.ts)
+- [x] F5 npm-build — VERIFIED (npm run build exits 0)

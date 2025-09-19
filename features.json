@@ -37,6 +37,6 @@
     "command": "npm run build",
     "expected": "tsc exits 0",
     "evidence": "evidence/npm-build.log",
-    "status": "UNVERIFIED"
+    "status": "VERIFIED"
   }
 ]
