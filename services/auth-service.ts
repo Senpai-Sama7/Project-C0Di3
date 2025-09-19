@@ -24,6 +24,11 @@ interface StoredUser extends User {
   passwordSalt: string;
 }
 
+interface StoredUser extends User {
+  passwordHash: string;
+  passwordSalt: string;
+}
+
 export interface Permission {
   resource: string;
   action: string;
@@ -665,6 +670,8 @@ export class AuthService {
       this.logger.warn('Legacy user credentials migrated. Prompt users to rotate passwords immediately.');
       this.saveUsers();
     }
+
+    return null;
   }
 
   private migrateLegacyUserCredentials(

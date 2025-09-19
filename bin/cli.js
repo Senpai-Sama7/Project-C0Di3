@@ -51,6 +51,8 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
 const PRODUCTION_CONFIG = {
   jwtSecret: JWT_SECRET,
   jwtExpiration: 24 * 60 * 60, // 24 hours
