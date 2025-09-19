@@ -1,5 +1,7 @@
-import { spawn } from 'child_process';
 import { Tool } from '../../types';
+import { ProcessTimeoutError, spawnWithTimeout } from '../process-utils';
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
  * SuricataTool securely wraps the Suricata CLI for network threat detection.
@@ -21,20 +23,24 @@ export class SuricataTool implements Tool {
       throw new Error('Log file is required and must be a valid file path.');
     }
     const args = ['-c', rules, '-i', iface, '-l', logFile];
-    return new Promise((resolve, reject) => {
-      const proc = spawn('suricata', args, { timeout: 60000 });
-      let stdout = '';
-      let stderr = '';
-      proc.stdout.on('data', (data) => { stdout += data.toString(); });
-      proc.stderr.on('data', (data) => { stderr += data.toString(); });
-      proc.on('error', (err) => reject(new Error('Failed to start suricata: ' + err.message)));
-      proc.on('close', (code) => {
-        if (code !== 0) {
-          return reject(new Error(stderr || `suricata exited with code ${code}`));
-        }
-        const summary = stdout.split('\n').slice(0, 10).join('\n');
-        resolve({ summary, full: stdout, success: true });
-      });
-    });
+
+    let result;
+    try {
+      result = await spawnWithTimeout('suricata', args, { timeoutMs: DEFAULT_TIMEOUT_MS });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to start suricata: ${message}`);
+    }
+
+    if (result.timedOut) {
+      throw new ProcessTimeoutError('suricata', DEFAULT_TIMEOUT_MS);
+    }
+
+    if (result.exitCode !== 0) {
+      throw new Error(result.stderr || `suricata exited with code ${result.exitCode}`);
+    }
+
+    const summary = result.stdout.split('\n').slice(0, 10).join('\n');
+    return { summary, full: result.stdout, success: true };
   }
 }

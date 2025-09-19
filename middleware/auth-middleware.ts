@@ -138,13 +138,18 @@ export class AuthMiddleware {
   /**
    * Log authentication event
    */
-  async logAuthEvent(context: AuthContext, action: string, resource: string, details?: Record<string, any>): Promise<void> {
+  async logAuthEvent(
+    context: AuthContext,
+    action: string,
+    resource: string,
+    details?: Record<string, any>
+  ): Promise<void> {
     await this.authService['logAuditEvent']({
       userId: context.user.id,
       username: context.user.username,
       action,
       resource,
-      details,
+      details: details ?? {},
       sessionId: context.session.id,
       success: true,
       duration: 0

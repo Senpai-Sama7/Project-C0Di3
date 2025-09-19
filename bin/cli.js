@@ -10,6 +10,7 @@ if (fs.existsSync(gitsenseiPath)) {
 }
 
 require('dotenv/config');
+process.env.TS_NODE_PREFER_TS_EXTS = process.env.TS_NODE_PREFER_TS_EXTS || 'true';
 require('ts-node/register');
 const { GemmaAgent } = require('../gemma3n:4B-agent');
 const { ToolRegistry } = require('../tools/tool-registry');
@@ -24,12 +25,12 @@ try {
   const tsNode = require('ts-node');
   tsNode.register();
 
-  const { AuthService: AuthServiceClass } = require('../services/auth-service');
-  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware');
-  const { CAGService: CAGServiceClass } = require('../services/cag-service');
-  const { EventBus: EventBusClass } = require('../events/event-bus');
-  const { Logger: LoggerClass } = require('../utils/logger');
-  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service');
+  const { AuthService: AuthServiceClass } = require('../services/auth-service.ts');
+  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware.ts');
+  const { CAGService: CAGServiceClass } = require('../services/cag-service.ts');
+  const { EventBus: EventBusClass } = require('../events/event-bus.ts');
+  const { Logger: LoggerClass } = require('../utils/logger.ts');
+  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service.ts');
 
   AuthService = AuthServiceClass;
   AuthMiddleware = AuthMiddlewareClass;
@@ -49,6 +50,8 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
 const PRODUCTION_CONFIG = {
   jwtSecret: JWT_SECRET,
   jwtExpiration: 24 * 60 * 60, // 24 hours
@@ -59,6 +62,16 @@ const PRODUCTION_CONFIG = {
   requireMFA: false,
   auditLogRetention: 90 // 90 days
 };
+
+if (!ADMIN_PASSWORD) {
+  console.error('FATAL ERROR: ADMIN_PASSWORD environment variable is not set. Application cannot start.');
+  process.exit(1);
+}
+
+if (ADMIN_PASSWORD.length < PRODUCTION_CONFIG.passwordMinLength) {
+  console.error(`FATAL ERROR: ADMIN_PASSWORD must be at least ${PRODUCTION_CONFIG.passwordMinLength} characters long.`);
+  process.exit(1);
+}
 
 class EnhancedCLI {
   constructor() {
