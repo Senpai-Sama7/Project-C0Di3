@@ -1,17 +1,5 @@
 import axios from 'axios';
-
-export interface LLMServiceOptions {
-  apiUrl?: string;
-  promptEnhancerUrl?: string;
-  timeout?: number;
-}
-
-export class LLMService {
-  private apiUrl: string;
-  private promptEnhancerUrl?: string;
-  private timeout: number;
-
-import { Logger } from '../utils/logger'; // Import Logger
+import { Logger } from '../utils/logger';
 
 export interface LLMServiceOptions {
   apiUrl?: string;

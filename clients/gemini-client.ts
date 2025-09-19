@@ -36,17 +36,18 @@ export class GeminiClient {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
 
-    const modelName = options.model ||
-      this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') ||
-      'gemini-2.0-flash-exp';
+    const modelName =
+      options.model || this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') || 'gemini-2.0-flash-exp';
+
+    const generationConfig = {
+      temperature: options.temperature ?? this.configManager?.get('gemini.temperature', 0.7),
+      maxOutputTokens: options.maxTokens ?? this.configManager?.get('gemini.maxTokens', 8192),
+      topP: options.topP ?? this.configManager?.get('gemini.topP', 0.9)
+    };
 
     this.model = this.genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: {
-        temperature: options.temperature || this.configManager?.get('gemini.temperature', 0.7),
-        maxOutputTokens: options.maxTokens || this.configManager?.get('gemini.maxTokens', 8192),
-        topP: options.topP || this.configManager?.get('gemini.topP', 0.9)
-      }
+      generationConfig
     });
   }
 
@@ -75,20 +76,111 @@ export class GeminiClient {
     }
   }
 
-  async generateStream(prompt: string, options: any = {}): Promise<AsyncGenerator<string, void, unknown>> {
+  async generateStream(
+    prompt: string,
+    options: { abortSignal?: AbortSignal } = {}
+  ): Promise<AsyncGenerator<string, void, unknown>> {
     try {
       this.logger.debug('Starting streaming generation for prompt:', prompt.substring(0, 100) + '...');
 
-      const result = await this.model.generateContentStream(prompt);
+      if (!this.model.generateContentStream) {
+        throw new Error('Streaming is not supported by the configured Gemini model');
+      }
 
-      async function* streamGenerator() {
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          if (chunkText) {
-            yield chunkText;
+      const rawResult = await this.model.generateContentStream(prompt);
+      const stream =
+        rawResult && typeof (rawResult as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function'
+          ? (rawResult as AsyncIterable<any>)
+          : (rawResult as { stream?: AsyncIterable<any> }).stream;
+
+      if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+        throw new Error('Gemini streaming response is not iterable');
+      }
+
+      const resolvedStream = stream as AsyncIterable<unknown>;
+      const iterator = resolvedStream[Symbol.asyncIterator]();
+      const abortSignal = options.abortSignal;
+      let aborted = false;
+      let abortListener: (() => void) | undefined;
+
+      const extractTextSegments = (chunk: unknown): string[] => {
+        const segments: string[] = [];
+        if (!chunk || typeof chunk !== 'object') {
+          return segments;
+        }
+
+        const maybeText = (chunk as { text?: unknown }).text;
+        if (typeof maybeText === 'string' && maybeText.length > 0) {
+          segments.push(maybeText);
+        } else if (typeof maybeText === 'function') {
+          try {
+            const result = maybeText.call(chunk);
+            if (typeof result === 'string' && result.length > 0) {
+              segments.push(result);
+            }
+          } catch (error) {
+            this.logger.warn('Gemini chunk text() accessor threw', error);
           }
         }
+
+        const candidates = (chunk as { candidates?: unknown }).candidates;
+        if (Array.isArray(candidates)) {
+          for (const candidate of candidates) {
+            const parts = (candidate as { content?: { parts?: unknown } })?.content?.parts;
+            if (!Array.isArray(parts)) {
+              continue;
+            }
+
+            for (const part of parts) {
+              const partText = (part as { text?: unknown })?.text;
+              if (typeof partText === 'string' && partText.length > 0) {
+                segments.push(partText);
+              }
+            }
+          }
+        }
+
+        return segments;
+      };
+
+      if (abortSignal) {
+        if (abortSignal.aborted) {
+          aborted = true;
+          iterator.return?.();
+        } else {
+          abortListener = () => {
+            aborted = true;
+            iterator.return?.();
+          };
+          abortSignal.addEventListener('abort', abortListener, { once: true });
+        }
       }
+
+      const cleanup = () => {
+        if (abortSignal && abortListener) {
+          abortSignal.removeEventListener('abort', abortListener);
+        }
+      };
+
+      const streamGenerator = async function* (this: GeminiClient) {
+        try {
+          while (!aborted) {
+            const { value, done } = await iterator.next();
+            if (done) {
+              break;
+            }
+
+            for (const segment of extractTextSegments(value)) {
+              yield segment;
+            }
+          }
+        } finally {
+          cleanup();
+          if (typeof iterator.return === 'function') {
+            await iterator.return();
+          }
+        }
+      }.bind(this);
 
       return streamGenerator();
     } catch (error) {
@@ -98,10 +190,7 @@ export class GeminiClient {
   }
 
   async embedText(text: string): Promise<number[]> {
-    // IMPORTANT: This is a placeholder and NOT a functional implementation.
-    // Gemini API might offer embedding capabilities through other model types (e.g., 'text-embedding-004')
-    // which would require a different setup.
-    const errorMessage = 'GeminiClient.embedText is not implemented. This method is a placeholder and does not generate real embeddings.';
+    const errorMessage = 'GeminiClient.embedText is intentionally disabled. Configure a supported embedding model before enabling embeddings.';
     this.logger.error(errorMessage);
     console.error(`CRITICAL: ${errorMessage} Input text (first 50 chars): "${text.substring(0,50)}"`);
     throw new Error(errorMessage);

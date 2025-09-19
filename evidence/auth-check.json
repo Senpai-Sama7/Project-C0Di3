@@ -1,0 +1,106 @@
+[2025-09-19T09:41:48.881Z] [INFO] [AuthService] AuthService initialized
+[2025-09-19T09:41:49.138Z] [INFO] [AuthService] AuthService initialized
+[
+  {
+    "id": "auth-admin-login",
+    "description": "Admin authenticates with configured password",
+    "outcome": {
+      "success": true,
+      "hasSession": true,
+      "tokenLength": 239,
+      "userRole": "admin"
+    }
+  },
+  {
+    "id": "auth-reject-bad-password",
+    "description": "Invalid password is rejected",
+    "outcome": {
+      "success": false,
+      "error": "Invalid credentials"
+    }
+  },
+  {
+    "id": "auth-signed-jwt",
+    "description": "Valid token decodes, tampered token fails",
+    "outcome": {
+      "validToken": {
+        "valid": true,
+        "session": {
+          "id": "ffdbaee6c2ce955057024b6810a550aa",
+          "userId": "admin",
+          "username": "admin",
+          "createdAt": "2025-09-19T09:41:48.966Z",
+          "lastActivity": "2025-09-19T09:41:49.054Z",
+          "permissions": [
+            {
+              "resource": "*",
+              "action": "*"
+            }
+          ],
+          "isActive": true
+        },
+        "user": {
+          "id": "admin",
+          "username": "admin",
+          "role": "admin",
+          "permissions": [
+            {
+              "resource": "*",
+              "action": "*"
+            }
+          ],
+          "createdAt": "2025-09-19T09:41:48.880Z",
+          "lastLogin": "2025-09-19T09:41:48.966Z",
+          "isActive": true,
+          "failedLoginAttempts": 1
+        }
+      },
+      "tamperedResult": {
+        "valid": false,
+        "error": "Invalid token signature"
+      }
+    }
+  },
+  {
+    "id": "auth-stored-hash",
+    "description": "Stored user record contains hash and salt but no plaintext password",
+    "outcome": {
+      "id": "admin",
+      "username": "admin",
+      "role": "admin",
+      "permissions": [
+        {
+          "resource": "*",
+          "action": "*"
+        }
+      ],
+      "createdAt": "2025-09-19T09:41:48.880Z",
+      "lastLogin": "2025-09-19T09:41:48.966Z",
+      "isActive": true,
+      "failedLoginAttempts": 1,
+      "passwordHash": "0dcd7e3600b5d1239e0f2da3db2335eeab32e7f636601af24a60da306133de44",
+      "passwordSalt": "06451937d25071e15dd32a715f93838a"
+    }
+  },
+  {
+    "id": "auth-context",
+    "description": "Temporary directory used for this verification run",
+    "outcome": {
+      "tmpDir": "/tmp/auth-reality-T7zUk2",
+      "files": [
+        "sessions.json",
+        "users.json"
+      ]
+    }
+  },
+  {
+    "id": "auth-legacy-migration",
+    "description": "Legacy user records missing hashes are auto-migrated with warnings",
+    "outcome": {
+      "migratedLogin": true,
+      "storedHash": true,
+      "storedSalt": true,
+      "retainedPlaintext": false
+    }
+  }
+]
