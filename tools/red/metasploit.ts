@@ -1,6 +1,8 @@
-import { spawn } from 'child_process';
 import { Tool } from '../../types';
 import { Logger } from '../../utils/logger';
+import { ProcessTimeoutError, spawnWithTimeout } from '../process-utils';
+
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 export class MetasploitTool implements Tool {
   name = 'metasploit';
@@ -25,24 +27,27 @@ export class MetasploitTool implements Tool {
         extraCmds += `; set ${String(key).replace(/[^\w.-]/g, '')} ${String(value).replace(/[^\w.-]/g, '')}`;
       }
     }
-    const command = `msfconsole -q -x "use ${safeExploit}; set RHOST ${safeTarget}; set PAYLOAD ${safePayload}${extraCmds}; run; exit"`;
-    this.logger.info('Executing Metasploit command', { command });
-    return new Promise((resolve, reject) => {
-      const proc = spawn('bash', ['-c', command], { timeout: 120000 });
-      let stdout = '';
-      let stderr = '';
-      proc.stdout.on('data', (data) => { stdout += data.toString(); });
-      proc.stderr.on('data', (data) => { stderr += data.toString(); });
-      proc.on('error', (err) => reject(new Error('Failed to start Metasploit: ' + err.message)));
-      proc.on('close', (code) => {
-        if (code !== 0) {
-          this.logger.error('Metasploit execution error', { error: code, stderr });
-          return reject(new Error(stderr || `Metasploit exited with code ${code}`));
-        }
-        // Normalize output
-        const summary = stdout.split('\n').slice(0, 10).join('\n');
-        resolve({ summary, full: stdout, success: true });
-      });
-    });
+    const commandScript = `use ${safeExploit}; set RHOST ${safeTarget}; set PAYLOAD ${safePayload}${extraCmds}; run; exit`;
+    this.logger.info('Executing Metasploit command', { script: commandScript });
+    let result;
+    try {
+      result = await spawnWithTimeout('msfconsole', ['-q', '-x', commandScript], { timeoutMs: DEFAULT_TIMEOUT_MS });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to start Metasploit: ${message}`);
+    }
+
+    if (result.timedOut) {
+      this.logger.error('Metasploit execution timed out', { timeoutMs: DEFAULT_TIMEOUT_MS });
+      throw new ProcessTimeoutError('Metasploit', DEFAULT_TIMEOUT_MS);
+    }
+
+    if (result.exitCode !== 0) {
+      this.logger.error('Metasploit execution error', { error: result.exitCode, stderr: result.stderr });
+      throw new Error(result.stderr || `Metasploit exited with code ${result.exitCode}`);
+    }
+
+    const summary = result.stdout.split('\n').slice(0, 10).join('\n');
+    return { summary, full: result.stdout, success: true };
   }
 }

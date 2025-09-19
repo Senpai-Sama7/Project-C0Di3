@@ -1,0 +1,2 @@
+a5fdc8a8432e5acb75f21d8c19a05ddd3d6e2fc9c1d113fdd8bd69b33e7c399a  evidence/auth-check.json
+e53b6e57cfb7a20013605fd9811047cc7e3d79d82ea8846c9956b5ba80458b5d  evidence/npm-build.log

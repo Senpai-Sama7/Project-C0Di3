@@ -10,11 +10,13 @@ if (fs.existsSync(gitsenseiPath)) {
 }
 
 require('dotenv/config');
+process.env.TS_NODE_PREFER_TS_EXTS = process.env.TS_NODE_PREFER_TS_EXTS || 'true';
 require('ts-node/register');
 const { GemmaAgent } = require('../gemma3n:4B-agent');
 const { ToolRegistry } = require('../tools/tool-registry');
 const readline = require('readline');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 // Import TypeScript modules (assuming they're compiled or using ts-node)
 let AuthService, AuthMiddleware, CAGService, EventBus, Logger, ShortcutService;
@@ -24,12 +26,12 @@ try {
   const tsNode = require('ts-node');
   tsNode.register();
 
-  const { AuthService: AuthServiceClass } = require('../services/auth-service');
-  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware');
-  const { CAGService: CAGServiceClass } = require('../services/cag-service');
-  const { EventBus: EventBusClass } = require('../events/event-bus');
-  const { Logger: LoggerClass } = require('../utils/logger');
-  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service');
+  const { AuthService: AuthServiceClass } = require('../services/auth-service.ts');
+  const { AuthMiddleware: AuthMiddlewareClass } = require('../middleware/auth-middleware.ts');
+  const { CAGService: CAGServiceClass } = require('../services/cag-service.ts');
+  const { EventBus: EventBusClass } = require('../events/event-bus.ts');
+  const { Logger: LoggerClass } = require('../utils/logger.ts');
+  const { ShortcutService: ShortcutServiceClass } = require('../services/shortcut-service.ts');
 
   AuthService = AuthServiceClass;
   AuthMiddleware = AuthMiddlewareClass;
@@ -60,6 +62,75 @@ const PRODUCTION_CONFIG = {
   auditLogRetention: 90 // 90 days
 };
 
+function resolveAdminPassword(config) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  let adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    if (isProduction) {
+      console.error('FATAL ERROR: ADMIN_PASSWORD environment variable is not set. Application cannot start.');
+      process.exit(1);
+    }
+
+    const length = Math.max(config.passwordMinLength, 16);
+    adminPassword = crypto.randomBytes(length).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, length);
+    process.env.ADMIN_PASSWORD = adminPassword;
+
+    const authDir = path.join(process.cwd(), 'data', 'auth');
+    fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
+    try {
+      fs.chmodSync(authDir, 0o700);
+    } catch (error) {
+      console.warn(`⚠️ Unable to enforce 0700 on ${authDir}: ${error.message}`);
+    }
+    const passwordFile = path.join(authDir, 'bootstrap-admin-password.txt');
+    fs.writeFileSync(passwordFile, `${adminPassword}\n`, { mode: 0o600 });
+    process.env.ADMIN_PASSWORD_BOOTSTRAP_FILE = passwordFile;
+
+    let cleanedUp = false;
+    const cleanupPasswordFile = () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+      try {
+        if (fs.existsSync(passwordFile)) {
+          fs.rmSync(passwordFile, { force: true });
+        }
+      } catch (cleanupError) {
+        console.warn(`⚠️ Unable to remove bootstrap admin password file: ${cleanupError.message}`);
+      }
+    };
+
+    process.once('exit', cleanupPasswordFile);
+    process.once('SIGINT', () => {
+      cleanupPasswordFile();
+      process.exit(130);
+    });
+    process.once('SIGTERM', () => {
+      cleanupPasswordFile();
+      process.exit(143);
+    });
+    console.warn(`[DEV ONLY] Generated admin password written to ${passwordFile}. Set ADMIN_PASSWORD to override.`);
+  }
+
+  if (process.env.ADMIN_PASSWORD.length < config.passwordMinLength) {
+    if (isProduction) {
+      console.error(`FATAL ERROR: ADMIN_PASSWORD must be at least ${config.passwordMinLength} characters long.`);
+      process.exit(1);
+    }
+
+    const length = Math.max(config.passwordMinLength, process.env.ADMIN_PASSWORD.length);
+    adminPassword = process.env.ADMIN_PASSWORD.padEnd(length, '!');
+    process.env.ADMIN_PASSWORD = adminPassword;
+    console.warn(`Adjusted ADMIN_PASSWORD length to meet minimum requirement (${config.passwordMinLength}).`);
+  }
+
+  return process.env.ADMIN_PASSWORD;
+}
+
+const ADMIN_PASSWORD = resolveAdminPassword(PRODUCTION_CONFIG);
+
 class EnhancedCLI {
   constructor() {
     this.eventBus = new EventBus();
@@ -71,6 +142,7 @@ class EnhancedCLI {
     this.currentSession = null;
     this.isAuthenticated = false;
     this.naturalLanguageMode = true;
+    this.bootstrapPasswordPath = process.env.ADMIN_PASSWORD_BOOTSTRAP_FILE;
   }
 
   /**
@@ -88,16 +160,17 @@ class EnhancedCLI {
     // Specific privileged operations should require explicit authentication if needed.
     if (process.env.CORE_USER && process.env.CORE_PASS) {
       const authResult = await this.authService.authenticate(
-          process.env.CORE_USER,
-          process.env.CORE_PASS
-        );
-        if (authResult.success) {
-          this.currentUser = authResult.user;
-          this.currentSession = authResult.session;
-          this.isAuthenticated = true;
-          console.log(`✅ Authenticated as ${authResult.user.username}`);
-        }
+        process.env.CORE_USER,
+        process.env.CORE_PASS
+      );
+      if (authResult.success) {
+        this.currentUser = authResult.user;
+        this.currentSession = authResult.session;
+        this.isAuthenticated = true;
+        console.log(`✅ Authenticated as ${authResult.user.username}`);
+        this.cleanupBootstrapPasswordFile();
       }
+    }
 
       // If not authenticated, prompt for login
       if (!this.isAuthenticated) {
@@ -145,6 +218,8 @@ class EnhancedCLI {
         console.log('✅ Authentication successful');
         console.log(`👤 Welcome, ${result.user.username} (${result.user.role})`);
 
+        this.cleanupBootstrapPasswordFile();
+
         // Log successful authentication
         await this.authMiddleware.logAuthEvent(
           { user: result.user, session: result.session, permissions: [] },
@@ -163,6 +238,24 @@ class EnhancedCLI {
       rl.close();
       console.error('❌ Authentication error:', error.message);
       return { success: false, error: error.message };
+    }
+  }
+
+  cleanupBootstrapPasswordFile() {
+    if (!this.bootstrapPasswordPath) {
+      return;
+    }
+
+    try {
+      if (fs.existsSync(this.bootstrapPasswordPath)) {
+        fs.rmSync(this.bootstrapPasswordPath, { force: true });
+        this.logger.warn(`[DEV ONLY] Removed bootstrap admin password file at ${this.bootstrapPasswordPath}.`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to remove bootstrap admin password file', error);
+    } finally {
+      delete process.env.ADMIN_PASSWORD_BOOTSTRAP_FILE;
+      this.bootstrapPasswordPath = undefined;
     }
   }
 

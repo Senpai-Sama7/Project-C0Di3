@@ -1,5 +1,7 @@
-import { spawn } from 'child_process';
 import { Tool } from '../tool-registry';
+import { ProcessTimeoutError, spawnWithTimeout } from '../process-utils';
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
  * NmapTool securely wraps the nmap CLI for network scanning.
@@ -22,22 +24,29 @@ export const NmapTool: Tool = {
       throw new Error('Options contain invalid characters.');
     }
     // Split options into array, filter out empty strings
-    const optionArgs = options ? options.split(' ').filter(Boolean) : [];
+    const optionArgs = options ? options.trim().split(/\s+/u).filter(Boolean) : [];
     const args = [...optionArgs, target];
-    return new Promise((resolve, reject) => {
-      const proc = spawn('nmap', args, { timeout: 60000 });
-      let stdout = '';
-      let stderr = '';
-      proc.stdout.on('data', (data) => { stdout += data.toString(); });
-      proc.stderr.on('data', (data) => { stderr += data.toString(); });
-      proc.on('error', (err) => reject(new Error('Failed to start nmap: ' + err.message)));
-      proc.on('close', (code) => {
-        if (code !== 0) {
-          return reject(new Error(stderr || `nmap exited with code ${code}`));
-        }
-        const summary = stdout.split('\n').slice(0, 10).join('\n');
-        resolve({ summary, full: stdout, success: true });
-      });
-    });
+    const timeoutMs = Number.isFinite(context?.timeoutMs)
+      ? Math.max(1000, Number(context.timeoutMs))
+      : DEFAULT_TIMEOUT_MS;
+
+    let result;
+    try {
+      result = await spawnWithTimeout('nmap', args, { timeoutMs });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to start nmap: ${message}`);
+    }
+
+    if (result.timedOut) {
+      throw new ProcessTimeoutError('nmap', timeoutMs);
+    }
+
+    if (result.exitCode !== 0) {
+      throw new Error(result.stderr || `nmap exited with code ${result.exitCode}`);
+    }
+
+    const summary = result.stdout.split('\n').slice(0, 10).join('\n');
+    return { summary, full: result.stdout, success: true };
   }
 };
