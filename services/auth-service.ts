@@ -678,13 +678,7 @@ export class AuthService {
       return { password: adminPassword, source: 'env:ADMIN_PASSWORD' };
     }
 
-    const fallback = 'password';
-    const normalized =
-      fallback.length >= this.config.passwordMinLength
-        ? fallback
-        : fallback.padEnd(this.config.passwordMinLength, '!');
-
-    return { password: normalized, source: 'default-password' };
+    return null;
   }
 
   private createDefaultUsers(): void {
