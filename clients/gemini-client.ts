@@ -36,17 +36,18 @@ export class GeminiClient {
 
     this.genAI = new GoogleGenerativeAI(apiKey);
 
-    const modelName = options.model ||
-      this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') ||
-      'gemini-2.0-flash-exp';
+    const modelName =
+      options.model || this.configManager?.get('gemini.model', 'gemini-2.0-flash-exp') || 'gemini-2.0-flash-exp';
+
+    const generationConfig = {
+      temperature: options.temperature ?? this.configManager?.get('gemini.temperature', 0.7),
+      maxOutputTokens: options.maxTokens ?? this.configManager?.get('gemini.maxTokens', 8192),
+      topP: options.topP ?? this.configManager?.get('gemini.topP', 0.9)
+    };
 
     this.model = this.genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: {
-        temperature: options.temperature || this.configManager?.get('gemini.temperature', 0.7),
-        maxOutputTokens: options.maxTokens || this.configManager?.get('gemini.maxTokens', 8192),
-        topP: options.topP || this.configManager?.get('gemini.topP', 0.9)
-      }
+      generationConfig
     });
   }
 
@@ -79,11 +80,26 @@ export class GeminiClient {
     try {
       this.logger.debug('Starting streaming generation for prompt:', prompt.substring(0, 100) + '...');
 
-      const result = await this.model.generateContentStream(prompt);
+      if (!this.model.generateContentStream) {
+        throw new Error('Streaming is not supported by the configured Gemini model');
+      }
+
+      const rawResult = await this.model.generateContentStream(prompt);
+      const stream =
+        rawResult && typeof (rawResult as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function'
+          ? (rawResult as AsyncIterable<any>)
+          : (rawResult as { stream?: AsyncIterable<any> }).stream;
+
+      if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+        throw new Error('Gemini streaming response is not iterable');
+      }
+
+      const resolvedStream = stream as AsyncIterable<any>;
 
       async function* streamGenerator() {
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
+        for await (const chunk of resolvedStream) {
+          const rawText = (chunk as any)?.text;
+          const chunkText = typeof rawText === 'function' ? rawText.call(chunk) : undefined;
           if (chunkText) {
             yield chunkText;
           }
