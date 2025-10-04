@@ -63,14 +63,19 @@ const working_memory_1 = require("./working-memory");
 class MemorySystem {
     constructor(options) {
         this.initialized = false;
-        // TODO: Implement secure key management for memory encryption
-        this.encryptionKey = process.env.MEMORY_ENCRYPTION_KEY || null;
         this.logger = new logger_1.Logger('MemorySystem');
         this.eventBus = options.eventBus || new event_bus_1.EventBus();
         this.persistencePath = options.persistencePath || './data/memory';
-        if (!this.encryptionKey) {
-            this.logger.warn('MEMORY_ENCRYPTION_KEY is not set. Persistent memory will not be encrypted. This is NOT secure for production.');
+        // Require encryption key for production security
+        const envKey = process.env.MEMORY_ENCRYPTION_KEY;
+        const optionsKey = options.encryptionKey;
+        this.encryptionKey = optionsKey || envKey || '';
+        if (!this.encryptionKey || this.encryptionKey.length < 32) {
+            const errorMsg = 'MEMORY_ENCRYPTION_KEY must be set and at least 32 characters for security. Set it in environment variables or options.';
+            this.logger.error(errorMsg);
+            throw new Error(errorMsg);
         }
+        this.logger.info('Memory encryption enabled with secure key');
         // Initialize embedding service
         this.embeddingService = new embedding_service_1.EmbeddingService();
         // Initialize vector store based on configuration

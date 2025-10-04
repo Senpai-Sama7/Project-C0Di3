@@ -114,6 +114,15 @@ export interface AgentContext {
   projectContext: ProjectContext | null;
   conversationHistory: ContextEntry[];
   volatileContext: Map<string, unknown>;
+  sessionId?: string;
+  userId?: string;
+  timestamp?: number;
+  domain?: string;
+  axioms?: string[];
+  principles?: string[];
+  constraints?: string[];
+  rules?: string[];
+  [key: string]: unknown;
 }
 
 /**
