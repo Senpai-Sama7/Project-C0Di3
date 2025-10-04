@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DarwinGodelEngine = void 0;
 const event_bus_1 = require("../events/event-bus");
+const embedding_service_1 = require("../services/embedding-service");
 const logger_1 = require("../utils/logger");
 /**
  * Darwin Gödel Machine - An advanced reasoning system combining evolutionary algorithms
@@ -31,6 +32,7 @@ class DarwinGodelEngine {
         this.memory = options.memory;
         this.eventBus = options.eventBus || new event_bus_1.EventBus();
         this.logger = new logger_1.Logger('DarwinGodelEngine');
+        this.embeddingService = new embedding_service_1.EmbeddingService();
         // Apply custom parameters if provided
         if (options.evolutionaryParams) {
             this.mutationRate = options.evolutionaryParams.mutationRate || this.mutationRate;
@@ -353,20 +355,49 @@ class DarwinGodelEngine {
     verifyHypothesis(hypothesis, axioms) {
         return __awaiter(this, void 0, void 0, function* () {
             const inconsistencies = [];
-            // 1. Verify axiom consistency using semantic analysis
+            // 1. Verify axiom consistency using semantic similarity via embeddings
             for (const axiom of axioms) {
-                const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-                const hypothesisLower = hypothesis.toLowerCase();
-                // Check if hypothesis contradicts or ignores the axiom
-                let axiomSupported = false;
-                for (const word of axiomWords) {
-                    if (hypothesisLower.includes(word)) {
-                        axiomSupported = true;
-                        break;
+                if (axiom.length === 0)
+                    continue;
+                try {
+                    // Get embeddings for semantic comparison
+                    const axiomEmbedding = yield this.embeddingService.getEmbedding(axiom);
+                    const hypothesisEmbedding = yield this.embeddingService.getEmbedding(hypothesis);
+                    // Calculate cosine similarity
+                    const similarity = this.cosineSimilarity(axiomEmbedding, hypothesisEmbedding);
+                    // If similarity is too low, the axiom may not be reflected in the hypothesis
+                    const SEMANTIC_THRESHOLD = 0.3; // Adjust based on testing
+                    if (similarity < SEMANTIC_THRESHOLD) {
+                        // Also check word-level matching as fallback
+                        const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                        const hypothesisLower = hypothesis.toLowerCase();
+                        let axiomSupported = false;
+                        for (const word of axiomWords) {
+                            if (hypothesisLower.includes(word)) {
+                                axiomSupported = true;
+                                break;
+                            }
+                        }
+                        if (!axiomSupported) {
+                            inconsistencies.push(`Axiom "${axiom}" not semantically reflected in hypothesis (similarity: ${similarity.toFixed(2)})`);
+                        }
                     }
                 }
-                if (!axiomSupported && axiom.length > 0) {
-                    inconsistencies.push(`Axiom "${axiom}" not reflected in hypothesis`);
+                catch (error) {
+                    // Fall back to word-level matching if embedding fails
+                    this.logger.warn(`Embedding failed for axiom verification, using fallback: ${error}`);
+                    const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                    const hypothesisLower = hypothesis.toLowerCase();
+                    let axiomSupported = false;
+                    for (const word of axiomWords) {
+                        if (hypothesisLower.includes(word)) {
+                            axiomSupported = true;
+                            break;
+                        }
+                    }
+                    if (!axiomSupported) {
+                        inconsistencies.push(`Axiom "${axiom}" not reflected in hypothesis`);
+                    }
                 }
             }
             // 2. Check for logical contradictions within hypothesis
@@ -403,6 +434,23 @@ class DarwinGodelEngine {
             });
             return { verified, confidence, inconsistencies };
         });
+    }
+    /**
+     * Calculate cosine similarity between two vectors
+     */
+    cosineSimilarity(a, b) {
+        let dot = 0;
+        let magA = 0;
+        let magB = 0;
+        const len = Math.min(a.length, b.length);
+        for (let i = 0; i < len; i++) {
+            dot += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        magA = Math.sqrt(magA);
+        magB = Math.sqrt(magB);
+        return (magA && magB) ? dot / (magA * magB) : 0;
     }
     /**
      * Extract the final solution from the verified hypothesis with proper formatting

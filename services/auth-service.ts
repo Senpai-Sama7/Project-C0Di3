@@ -1,5 +1,6 @@
 import { EventBus } from '../events/event-bus';
 import { Logger } from '../utils/logger';
+import { TokenBucketRateLimiter } from '../utils/rate-limiter';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -56,6 +57,8 @@ export interface Session {
   userAgent?: string;
   permissions: Permission[];
   isActive: boolean;
+  refreshToken?: string; // Refresh token for this session
+  refreshTokenExpiry?: Date; // Expiry for refresh token
 }
 
 export enum UserRole {
@@ -70,6 +73,7 @@ export enum UserRole {
 export interface AuthConfig {
   jwtSecret: string;
   jwtExpiration: number; // in seconds
+  refreshTokenExpiration?: number; // in seconds (default: 7 days)
   maxFailedAttempts: number;
   lockoutDuration: number; // in minutes
   sessionTimeout: number; // in minutes
@@ -96,6 +100,10 @@ export class AuthService {
   private auditLogs: AuditLog[] = [];
 
   private readonly legacyCredentialWarnings = new Set<string>();
+  
+  // Rate limiters for different operations
+  private readonly authRateLimiter: TokenBucketRateLimiter;
+  private readonly tokenRefreshRateLimiter: TokenBucketRateLimiter;
 
   private readonly auditLogFile: string;
   private readonly usersFile: string;
@@ -105,6 +113,12 @@ export class AuthService {
     this.eventBus = eventBus;
     this.logger = new Logger('AuthService');
     this.config = config;
+    
+    // Initialize rate limiters
+    // Auth: 5 attempts per minute per IP
+    this.authRateLimiter = new TokenBucketRateLimiter(5, 5 / 60);
+    // Token refresh: 10 per minute
+    this.tokenRefreshRateLimiter = new TokenBucketRateLimiter(10, 10 / 60);
 
     // Initialize file paths
     this.auditLogFile = path.join(process.cwd(), 'data', 'logs', 'audit.log');
@@ -132,7 +146,13 @@ export class AuthService {
     password: string,
     ipAddress?: string,
     userAgent?: string
-  ): Promise<{ success: boolean; token?: string; session?: Session; user?: User; error?: string }> {
+  ): Promise<{ success: boolean; token?: string; refreshToken?: string; session?: Session; user?: User; error?: string }> {
+    // Apply rate limiting
+    if (!this.authRateLimiter.consume(1)) {
+      this.logger.warn(`Rate limit exceeded for authentication from ${ipAddress || 'unknown'}`);
+      return { success: false, error: 'Too many authentication attempts. Please try again later.' };
+    }
+    
     const startTime = Date.now();
     const sessionId = this.generateSessionId();
 
@@ -230,6 +250,7 @@ export class AuthService {
       return {
         success: true,
         token,
+        refreshToken: session.refreshToken,
         session: this.cloneSession(session),
         user: this.toPublicUser(user)
       };
@@ -295,6 +316,97 @@ export class AuthService {
       }
 
       return { valid: false, error: 'Invalid token' };
+    }
+  }
+
+  /**
+   * Refresh an access token using a refresh token
+   */
+  async refreshAccessToken(
+    refreshToken: string
+  ): Promise<{ success: boolean; token?: string; refreshToken?: string; error?: string }> {
+    // Apply rate limiting
+    if (!this.tokenRefreshRateLimiter.consume(1)) {
+      this.logger.warn('Rate limit exceeded for token refresh');
+      return { success: false, error: 'Too many refresh attempts. Please try again later.' };
+    }
+
+    try {
+      // Find session with matching refresh token using constant-time comparison
+      let matchingSession: Session | null = null;
+      
+      for (const session of this.sessions.values()) {
+        if (session.refreshToken && session.isActive) {
+          try {
+            // Use constant-time comparison to prevent timing attacks
+            const isMatch = crypto.timingSafeEqual(
+              Buffer.from(session.refreshToken),
+              Buffer.from(refreshToken)
+            );
+            if (isMatch) {
+              matchingSession = session;
+              break;
+            }
+          } catch (error) {
+            // Buffer lengths don't match, continue to next session
+            continue;
+          }
+        }
+      }
+
+      if (!matchingSession) {
+        this.logger.warn('Invalid refresh token provided');
+        return { success: false, error: 'Invalid refresh token' };
+      }
+
+      // Check if refresh token has expired
+      if (matchingSession.refreshTokenExpiry && matchingSession.refreshTokenExpiry < new Date()) {
+        matchingSession.isActive = false;
+        this.saveSessions();
+        this.logger.warn(`Refresh token expired for session: ${matchingSession.id}`);
+        return { success: false, error: 'Refresh token expired' };
+      }
+
+      // Check if user still exists and is active
+      const user = this.users.get(matchingSession.userId);
+      if (!user || !user.isActive) {
+        matchingSession.isActive = false;
+        this.saveSessions();
+        return { success: false, error: 'User account is not active' };
+      }
+
+      // Generate new JWT access token
+      const newToken = this.generateJWT(matchingSession);
+      
+      // Optionally rotate refresh token for additional security
+      const newRefreshToken = crypto.randomBytes(32).toString('hex');
+      const refreshTokenExpiration = this.config.refreshTokenExpiration || 7 * 24 * 60 * 60;
+      matchingSession.refreshToken = newRefreshToken;
+      matchingSession.refreshTokenExpiry = new Date(Date.now() + refreshTokenExpiration * 1000);
+      matchingSession.lastActivity = new Date();
+      
+      this.saveSessions();
+
+      await this.logAuditEvent({
+        userId: matchingSession.userId,
+        username: matchingSession.username,
+        action: 'TOKEN_REFRESH',
+        resource: 'auth',
+        details: { sessionId: matchingSession.id },
+        sessionId: matchingSession.id,
+        success: true,
+        duration: 0
+      });
+
+      return {
+        success: true,
+        token: newToken,
+        refreshToken: newRefreshToken
+      };
+
+    } catch (error: unknown) {
+      this.logger.error('Token refresh error', error);
+      return { success: false, error: 'Token refresh failed' };
     }
   }
 
@@ -802,6 +914,11 @@ export class AuthService {
   }
 
   private createSession(user: StoredUser, ipAddress?: string, userAgent?: string): Session {
+    // Generate refresh token
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    const refreshTokenExpiration = this.config.refreshTokenExpiration || 7 * 24 * 60 * 60; // 7 days default
+    const refreshTokenExpiry = new Date(Date.now() + refreshTokenExpiration * 1000);
+    
     const session: Session = {
       id: this.generateSessionId(),
       userId: user.id,
@@ -811,7 +928,9 @@ export class AuthService {
       ipAddress,
       userAgent,
       permissions: user.permissions,
-      isActive: true
+      isActive: true,
+      refreshToken,
+      refreshTokenExpiry
     };
 
     this.sessions.set(session.id, session);

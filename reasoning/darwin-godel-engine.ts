@@ -1,5 +1,6 @@
 import { EventBus } from '../events/event-bus';
 import { MemorySystem } from '../memory/memory-system';
+import { EmbeddingService } from '../services/embedding-service';
 import { LLMClient } from '../types';
 import { Logger } from '../utils/logger';
 
@@ -12,6 +13,7 @@ export class DarwinGodelEngine {
   private memory: MemorySystem;
   private eventBus: EventBus;
   private logger: Logger;
+  private embeddingService: EmbeddingService;
 
   // Evolutionary parameters
   private mutationRate = 0.1;
@@ -28,6 +30,7 @@ export class DarwinGodelEngine {
     this.memory = options.memory;
     this.eventBus = options.eventBus || new EventBus();
     this.logger = new Logger('DarwinGodelEngine');
+    this.embeddingService = new EmbeddingService();
 
     // Apply custom parameters if provided
     if (options.evolutionaryParams) {
@@ -433,22 +436,54 @@ export class DarwinGodelEngine {
   ): Promise<VerificationResult> {
     const inconsistencies: string[] = [];
     
-    // 1. Verify axiom consistency using semantic analysis
+    // 1. Verify axiom consistency using semantic similarity via embeddings
     for (const axiom of axioms) {
-      const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-      const hypothesisLower = hypothesis.toLowerCase();
+      if (axiom.length === 0) continue;
       
-      // Check if hypothesis contradicts or ignores the axiom
-      let axiomSupported = false;
-      for (const word of axiomWords) {
-        if (hypothesisLower.includes(word)) {
-          axiomSupported = true;
-          break;
+      try {
+        // Get embeddings for semantic comparison
+        const axiomEmbedding = await this.embeddingService.getEmbedding(axiom);
+        const hypothesisEmbedding = await this.embeddingService.getEmbedding(hypothesis);
+        
+        // Calculate cosine similarity
+        const similarity = this.cosineSimilarity(axiomEmbedding, hypothesisEmbedding);
+        
+        // If similarity is too low, the axiom may not be reflected in the hypothesis
+        const SEMANTIC_THRESHOLD = 0.3; // Adjust based on testing
+        if (similarity < SEMANTIC_THRESHOLD) {
+          // Also check word-level matching as fallback
+          const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const hypothesisLower = hypothesis.toLowerCase();
+          
+          let axiomSupported = false;
+          for (const word of axiomWords) {
+            if (hypothesisLower.includes(word)) {
+              axiomSupported = true;
+              break;
+            }
+          }
+          
+          if (!axiomSupported) {
+            inconsistencies.push(`Axiom "${axiom}" not semantically reflected in hypothesis (similarity: ${similarity.toFixed(2)})`);
+          }
         }
-      }
-      
-      if (!axiomSupported && axiom.length > 0) {
-        inconsistencies.push(`Axiom "${axiom}" not reflected in hypothesis`);
+      } catch (error) {
+        // Fall back to word-level matching if embedding fails
+        this.logger.warn(`Embedding failed for axiom verification, using fallback: ${error}`);
+        const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const hypothesisLower = hypothesis.toLowerCase();
+        
+        let axiomSupported = false;
+        for (const word of axiomWords) {
+          if (hypothesisLower.includes(word)) {
+            axiomSupported = true;
+            break;
+          }
+        }
+        
+        if (!axiomSupported) {
+          inconsistencies.push(`Axiom "${axiom}" not reflected in hypothesis`);
+        }
       }
     }
     
@@ -490,6 +525,27 @@ export class DarwinGodelEngine {
     });
     
     return { verified, confidence, inconsistencies };
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private cosineSimilarity(a: number[], b: number[]): number {
+    let dot = 0;
+    let magA = 0;
+    let magB = 0;
+    
+    const len = Math.min(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      dot += a[i] * b[i];
+      magA += a[i] * a[i];
+      magB += b[i] * b[i];
+    }
+    
+    magA = Math.sqrt(magA);
+    magB = Math.sqrt(magB);
+    
+    return (magA && magB) ? dot / (magA * magB) : 0;
   }
 
   /**
