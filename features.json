@@ -58,7 +58,7 @@
   {
     "id": "F8",
     "feature": "Documentation markdown files include YAML front matter",
-    "command": "python - <<'PY' | tee evidence/docs-front-matter.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = text[0:1] == ['---'] and 'layout:' in text[1] and 'title:' in text[2]\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
+    "command": "python - <<'PY' | tee evidence/docs-front-matter.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = False\n    if len(text) >= 4 and text[0] == '---' and text[3] == '---':\n        front_matter = '\\n'.join(text[1:3])\n        if 'layout:' in front_matter and 'title:' in front_matter:\n            status = True\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
     "expected": "all docs/*.md lines report OK",
     "evidence": "evidence/docs-front-matter.txt",
     "status": "VERIFIED"
