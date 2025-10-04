@@ -54,7 +54,7 @@ const memory_cache_1 = require("./memory-cache");
 const procedural_memory_1 = require("./procedural-memory");
 const semantic_memory_1 = require("./semantic-memory");
 const chromadb_store_1 = require("./stores/chromadb-store");
-const inmemory_store_1 = require("./stores/inmemory-store");
+const hnsw_store_1 = require("./stores/hnsw-store");
 const postgres_store_1 = require("./stores/postgres-store");
 const working_memory_1 = require("./working-memory");
 /**
@@ -102,7 +102,21 @@ class MemorySystem {
             case 'chromadb':
                 return new chromadb_store_1.ChromaDBVectorStore();
             case 'inmemory':
-                return new inmemory_store_1.InMemoryVectorStore();
+                // Use HNSW for in-memory with better performance
+                return new hnsw_store_1.HNSWVectorStore({
+                    M: 16,
+                    efConstruction: 200,
+                    efSearch: 50,
+                    persistencePath: path.join(this.persistencePath, 'hnsw-index')
+                });
+            case 'hnsw':
+                // Explicit HNSW option
+                return new hnsw_store_1.HNSWVectorStore({
+                    M: options.hnswM || 16,
+                    efConstruction: options.hnswEfConstruction || 200,
+                    efSearch: options.hnswEfSearch || 50,
+                    persistencePath: path.join(this.persistencePath, 'hnsw-index')
+                });
             case 'postgres':
                 if (!options.connectionString) {
                     throw new Error('PostgresVectorStore requires a connectionString');

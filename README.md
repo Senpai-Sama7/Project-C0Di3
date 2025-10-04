@@ -715,14 +715,35 @@ core --debug-mode
 
 ---
 
-## Default Credentials
+## Initial Setup & Security
 
-For initial access, use these default credentials:
+### First-Time Authentication
 
-- **Username**: `admin`
-- **Password**: `admin123`
+On first startup, the system will prompt you to create an admin account with:
+- **Username**: Choose a secure username (minimum 4 characters)
+- **Password**: Must be at least 8 characters with mixed case, numbers, and special characters
 
-*⚠️ Change these immediately after first login for production use.*
+### Environment Configuration Required
+
+Before running the system, set the following required environment variables:
+
+```bash
+# Required: Encryption key for memory system (minimum 32 characters)
+export MEMORY_ENCRYPTION_KEY="your-secure-random-key-min-32-chars"
+
+# Required: JWT secret for authentication (minimum 32 characters)
+export JWT_SECRET="your-secure-jwt-secret-min-32-chars"
+
+# Optional: Admin password for initialization
+export ADMIN_PASSWORD="YourSecurePassword123!"
+```
+
+**Security Best Practices:**
+- Never commit credentials to source control
+- Use strong, randomly generated keys (see `openssl rand -base64 32`)
+- Rotate encryption keys and secrets regularly
+- Store sensitive configuration in secure vaults (HashiCorp Vault, AWS KMS, etc.)
+- Enable audit logging for all authentication events
 
 ---
 

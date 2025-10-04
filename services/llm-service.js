@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LLMService = void 0;
 const axios_1 = __importDefault(require("axios"));
 const logger_1 = require("../utils/logger");
+const rate_limiter_1 = require("../utils/rate-limiter");
+const error_handling_1 = require("../utils/error-handling");
 class LLMService {
     constructor(options = {}) {
         this.logger = new logger_1.Logger('LLMService');
@@ -46,7 +48,18 @@ class LLMService {
             // this.logger.warn(`PROMPT_ENHANCER_URL not set, using default: ${this.promptEnhancerUrl}`);
         }
         this.timeout = options.timeout || 15000;
-        this.logger.info(`LLMService initialized. API URL: ${this.apiUrl}, Prompt Enhancer URL: ${this.promptEnhancerUrl || 'Not configured'}`);
+        // Initialize rate limiter (default: 10 requests per second)
+        const rpsLimit = options.rateLimitRequestsPerSecond || 10;
+        this.rateLimiter = new rate_limiter_1.TokenBucketRateLimiter(rpsLimit * 2, rpsLimit);
+        // Initialize circuit breaker (default: 5 failures, 60s timeout)
+        const cbThreshold = options.circuitBreakerThreshold || 5;
+        const cbTimeout = options.circuitBreakerTimeout || 60000;
+        this.circuitBreaker = new error_handling_1.CircuitBreaker({
+            failureThreshold: cbThreshold,
+            resetTimeoutMs: cbTimeout,
+            halfOpenRequests: 1
+        });
+        this.logger.info(`LLMService initialized. API URL: ${this.apiUrl}, Prompt Enhancer URL: ${this.promptEnhancerUrl || 'Not configured'}, Rate Limit: ${rpsLimit} req/s`);
     }
     /**
      * Enhance a prompt using an external Python microservice
@@ -73,19 +86,30 @@ class LLMService {
      */
     complete(prompt_1) {
         return __awaiter(this, arguments, void 0, function* (prompt, opts = {}) {
-            try {
-                const response = yield axios_1.default.post(`${this.apiUrl}/completion`, {
-                    prompt,
-                    n_predict: opts.n_predict || 256,
-                    temperature: opts.temperature || 0.7,
-                    stream: false,
-                    stop: opts.stop || undefined
-                }, { timeout: this.timeout });
-                return response.data.content;
-            }
-            catch (err) {
-                throw new Error(`LLMService: ${err.message}`);
-            }
+            // Apply rate limiting
+            yield this.rateLimiter.wait(1);
+            // Execute with circuit breaker and retry logic
+            return yield this.circuitBreaker.execute(() => __awaiter(this, void 0, void 0, function* () {
+                return (0, error_handling_1.withRetry)(() => __awaiter(this, void 0, void 0, function* () {
+                    const response = yield axios_1.default.post(`${this.apiUrl}/completion`, {
+                        prompt,
+                        n_predict: opts.n_predict || 256,
+                        temperature: opts.temperature || 0.7,
+                        stream: false,
+                        stop: opts.stop || undefined
+                    }, { timeout: this.timeout });
+                    return response.data.content;
+                }), {
+                    maxRetries: 3,
+                    initialDelayMs: 1000,
+                    maxDelayMs: 10000,
+                    backoffMultiplier: 2,
+                    retryableErrors: (error) => {
+                        const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED'];
+                        return retryableCodes.some(code => error.message.includes(code));
+                    }
+                });
+            }));
         });
     }
     /**

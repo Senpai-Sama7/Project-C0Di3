@@ -10,6 +10,7 @@ import { ProceduralMemory } from './procedural-memory';
 import { SemanticMemory } from './semantic-memory';
 import { ChromaDBVectorStore } from './stores/chromadb-store';
 import { InMemoryVectorStore } from './stores/inmemory-store';
+import { HNSWVectorStore } from './stores/hnsw-store';
 import { PostgresVectorStore } from './stores/postgres-store';
 import { VectorStore } from './vector-store';
 import { WorkingMemory } from './working-memory';
@@ -87,7 +88,21 @@ export class MemorySystem {
       case 'chromadb':
         return new ChromaDBVectorStore();
       case 'inmemory':
-        return new InMemoryVectorStore();
+        // Use HNSW for in-memory with better performance
+        return new HNSWVectorStore({
+          M: 16,
+          efConstruction: 200,
+          efSearch: 50,
+          persistencePath: path.join(this.persistencePath, 'hnsw-index')
+        });
+      case 'hnsw':
+        // Explicit HNSW option
+        return new HNSWVectorStore({
+          M: options.hnswM || 16,
+          efConstruction: options.hnswEfConstruction || 200,
+          efSearch: options.hnswEfSearch || 50,
+          persistencePath: path.join(this.persistencePath, 'hnsw-index')
+        });
       case 'postgres':
         if (!options.connectionString) {
           throw new Error('PostgresVectorStore requires a connectionString');
@@ -396,10 +411,14 @@ export interface MemorySystemOptions {
   persistencePath?: string;
   cacheSize?: number;
   cacheTTL?: number;
-  vectorStoreType?: 'chromadb' | 'inmemory' | 'postgres';
+  vectorStoreType?: 'chromadb' | 'inmemory' | 'postgres' | 'hnsw';
   connectionString?: string;
   workingMemoryCapacity?: number;
   encryptionKey?: string; // Encryption key for memory persistence
+  // HNSW-specific options
+  hnswM?: number; // Maximum connections per layer (default: 16)
+  hnswEfConstruction?: number; // Construction search depth (default: 200)
+  hnswEfSearch?: number; // Search depth (default: 50)
 }
 
 export interface RetrieveOptions {
