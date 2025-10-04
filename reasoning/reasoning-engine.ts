@@ -517,9 +517,106 @@ export class ReasoningEngine {
   }
 
   async validateReasoningProcess(plan: any): Promise<boolean> {
-    this.logger.debug('Validating reasoning process:', plan);
-    // Placeholder for actual validation logic
-    return true;
+    this.logger.debug('Validating reasoning process');
+    
+    try {
+      // 1. Validate plan structure
+      if (!plan) {
+        this.logger.error('Plan is null or undefined');
+        return false;
+      }
+      
+      if (!plan.steps || !Array.isArray(plan.steps)) {
+        this.logger.error('Plan missing steps array');
+        return false;
+      }
+      
+      if (plan.steps.length === 0) {
+        this.logger.error('Plan has no steps');
+        return false;
+      }
+      
+      // 2. Validate each step has required properties
+      for (let i = 0; i < plan.steps.length; i++) {
+        const step = plan.steps[i];
+        
+        if (!step.type) {
+          this.logger.error(`Step ${i} missing type`);
+          return false;
+        }
+        
+        if (!step.description) {
+          this.logger.warn(`Step ${i} missing description`);
+        }
+        
+        // Validate step type is recognized
+        const validTypes = ['generation', 'tool', 'darwin-godel', 'absolute-zero'];
+        if (!validTypes.includes(step.type)) {
+          this.logger.error(`Step ${i} has invalid type: ${step.type}`);
+          return false;
+        }
+        
+        // Validate tool steps have tool name
+        if (step.type === 'tool' && !step.tool) {
+          this.logger.error(`Tool step ${i} missing tool name`);
+          return false;
+        }
+      }
+      
+      // 3. Check for required tools and verify they're available
+      if (plan.toolsRequired && Array.isArray(plan.toolsRequired)) {
+        for (const toolName of plan.toolsRequired) {
+          const tool = this.toolRegistry.getTool(toolName);
+          if (!tool) {
+            this.logger.error(`Required tool not available: ${toolName}`);
+            return false;
+          }
+        }
+      }
+      
+      // 4. Validate complexity estimate is reasonable
+      if (plan.estimatedComplexity !== undefined) {
+        if (typeof plan.estimatedComplexity !== 'number' || 
+            plan.estimatedComplexity < 0 || 
+            plan.estimatedComplexity > 1) {
+          this.logger.error(`Invalid complexity estimate: ${plan.estimatedComplexity}`);
+          return false;
+        }
+      }
+      
+      // 5. Validate step dependencies (if present)
+      if (plan.steps.some((s: any) => s.dependencies)) {
+        const stepIds = new Set(plan.steps.map((s: any) => s.id).filter((id: any) => id));
+        
+        for (const step of plan.steps) {
+          if (step.dependencies && Array.isArray(step.dependencies)) {
+            for (const depId of step.dependencies) {
+              if (!stepIds.has(depId)) {
+                this.logger.error(`Step ${step.id || 'unknown'} depends on non-existent step: ${depId}`);
+                return false;
+              }
+            }
+          }
+        }
+      }
+      
+      // 6. Emit validation success event
+      this.eventBus.emit('reasoning.validation.success', {
+        stepCount: plan.steps.length,
+        complexity: plan.estimatedComplexity,
+        toolsRequired: plan.toolsRequired?.length || 0
+      });
+      
+      this.logger.debug('Reasoning process validation passed', {
+        steps: plan.steps.length,
+        complexity: plan.estimatedComplexity
+      });
+      
+      return true;
+    } catch (error) {
+      this.logger.error('Error during reasoning validation:', error);
+      return false;
+    }
   }
 
   /**

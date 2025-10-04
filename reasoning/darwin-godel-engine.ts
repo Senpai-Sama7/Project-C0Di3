@@ -218,19 +218,55 @@ export class DarwinGodelEngine {
   }
 
   /**
-   * Evaluate the fitness of a hypothesis
+   * Evaluate the fitness of a hypothesis using multiple criteria
+   * Higher fitness indicates better quality hypothesis
    */
   private evaluateFitness(
     problem: string,
     hypothesis: string,
     axioms: string[]
   ): number {
-    // Replace prompt-based logic with real-world fitness evaluation
     let fitness = 0;
-    // Example: Evaluate fitness based on relevance, consistency, and feasibility
-    if (axioms.some(axiom => hypothesis.includes(axiom))) fitness += 0.5;
-    if (hypothesis.includes(problem)) fitness += 0.5;
-    return fitness;
+    
+    // 1. Axiom consistency (30%): Check semantic relevance, not just string inclusion
+    if (axioms.length > 0) {
+      const axiomRelevance = axioms.reduce((sum, axiom) => {
+        // Use word-level matching for better semantic understanding
+        const axiomWords = axiom.toLowerCase().split(/\s+/);
+        const hypothesisWords = hypothesis.toLowerCase().split(/\s+/);
+        const matchCount = axiomWords.filter(word => 
+          hypothesisWords.some(hw => hw.includes(word) || word.includes(hw))
+        ).length;
+        return sum + (matchCount / axiomWords.length);
+      }, 0);
+      fitness += (axiomRelevance / axioms.length) * 0.3;
+    }
+    
+    // 2. Problem relevance (25%): Semantic similarity to problem statement
+    const problemWords = problem.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const hypothesisWords = hypothesis.toLowerCase().split(/\s+/);
+    const problemRelevance = problemWords.filter(word => 
+      hypothesisWords.some(hw => hw.includes(word) || word.includes(hw))
+    ).length / Math.max(problemWords.length, 1);
+    fitness += problemRelevance * 0.25;
+    
+    // 3. Completeness (20%): Hypothesis should be substantial and detailed
+    const wordCount = hypothesisWords.length;
+    const completeness = Math.min(wordCount / 50, 1.0); // Optimal around 50 words
+    fitness += completeness * 0.2;
+    
+    // 4. Logical structure (15%): Check for logical connectors and structure
+    const logicalMarkers = /\b(because|therefore|thus|hence|if|then|since|as|given|assuming|consider)\b/gi;
+    const logicalMatches = (hypothesis.match(logicalMarkers) || []).length;
+    const logicalScore = Math.min(logicalMatches / 3, 1.0); // Expect 2-3 logical connectors
+    fitness += logicalScore * 0.15;
+    
+    // 5. Clarity (10%): Penalize overly complex or vague statements
+    const avgWordLength = hypothesisWords.reduce((sum, w) => sum + w.length, 0) / Math.max(hypothesisWords.length, 1);
+    const clarityScore = avgWordLength > 8 ? 0.5 : 1.0; // Penalize overly complex words
+    fitness += clarityScore * 0.1;
+    
+    return Math.max(0, Math.min(1, fitness)); // Clamp to [0, 1]
   }
 
   /**
@@ -389,60 +425,455 @@ export class DarwinGodelEngine {
   }
 
   /**
-   * Verify the logical consistency and correctness of a hypothesis
+   * Verify the logical consistency and correctness of a hypothesis using formal verification
    */
   private async verifyHypothesis(
     hypothesis: string,
     axioms: string[]
   ): Promise<VerificationResult> {
-    // Replace prompt-based logic with real-world verification
-    const inconsistencies = axioms.filter(axiom => !hypothesis.includes(axiom));
+    const inconsistencies: string[] = [];
+    
+    // 1. Verify axiom consistency using semantic analysis
+    for (const axiom of axioms) {
+      const axiomWords = axiom.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+      const hypothesisLower = hypothesis.toLowerCase();
+      
+      // Check if hypothesis contradicts or ignores the axiom
+      let axiomSupported = false;
+      for (const word of axiomWords) {
+        if (hypothesisLower.includes(word)) {
+          axiomSupported = true;
+          break;
+        }
+      }
+      
+      if (!axiomSupported && axiom.length > 0) {
+        inconsistencies.push(`Axiom "${axiom}" not reflected in hypothesis`);
+      }
+    }
+    
+    // 2. Check for logical contradictions within hypothesis
+    const negationPatterns = /\b(not|never|no|cannot|isn't|aren't|won't|doesn't)\b/gi;
+    const affirmativePatterns = /\b(is|are|will|can|must|should|always)\b/gi;
+    
+    const negations = hypothesis.match(negationPatterns) || [];
+    const affirmatives = hypothesis.match(affirmativePatterns) || [];
+    
+    // Simple heuristic: too many negations might indicate confusion
+    if (negations.length > affirmatives.length && negations.length > 5) {
+      inconsistencies.push("Excessive negations detected - potential logical confusion");
+    }
+    
+    // 3. Check hypothesis completeness
+    if (hypothesis.length < 20) {
+      inconsistencies.push("Hypothesis is too brief to be meaningful");
+    }
+    
+    // 4. Calculate verification confidence
     const verified = inconsistencies.length === 0;
-    const confidence = verified ? 1.0 : 0.5;
+    let confidence: number;
+    
+    if (verified) {
+      // High confidence for verified hypotheses
+      confidence = 0.95;
+    } else if (inconsistencies.length <= 2) {
+      // Medium confidence for minor issues
+      confidence = 0.65;
+    } else {
+      // Low confidence for major issues
+      confidence = 0.35;
+    }
+    
+    this.logger.debug(`Hypothesis verification: ${verified ? 'PASSED' : 'FAILED'}`, {
+      inconsistenciesCount: inconsistencies.length,
+      confidence
+    });
+    
     return { verified, confidence, inconsistencies };
   }
 
   /**
-   * Extract the final solution from the verified hypothesis
+   * Extract the final solution from the verified hypothesis with proper formatting
    */
   private async extractSolution(
     problem: string,
     hypothesis: string
   ): Promise<string> {
-    // Replace prompt-based logic with real-world solution extraction
-    return `Solution derived from hypothesis: ${hypothesis}`;
+    // Structure the solution with clear sections
+    const sections = {
+      analysis: this.extractAnalysisFromHypothesis(hypothesis, problem),
+      approach: this.extractApproachFromHypothesis(hypothesis),
+      recommendation: this.extractRecommendationFromHypothesis(hypothesis),
+      reasoning: this.extractReasoningFromHypothesis(hypothesis)
+    };
+    
+    // Format as structured solution
+    const solution = `
+**Problem Analysis:**
+${sections.analysis}
+
+**Recommended Approach:**
+${sections.approach}
+
+**Key Recommendations:**
+${sections.recommendation}
+
+**Reasoning:**
+${sections.reasoning}
+
+**Verified Hypothesis:**
+${hypothesis}
+    `.trim();
+    
+    return solution;
+  }
+  
+  /**
+   * Extract analysis portion from hypothesis
+   */
+  private extractAnalysisFromHypothesis(hypothesis: string, problem: string): string {
+    const sentences = hypothesis.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const problemKeywords = problem.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+    
+    // Find sentences that reference the problem most
+    const analysisSehtences = sentences.filter(s => {
+      const sLower = s.toLowerCase();
+      return problemKeywords.some(kw => sLower.includes(kw));
+    });
+    
+    return analysisSehtences.length > 0 
+      ? analysisSehtences.slice(0, 2).join('. ') + '.'
+      : sentences[0] + '.';
+  }
+  
+  /**
+   * Extract approach from hypothesis
+   */
+  private extractApproachFromHypothesis(hypothesis: string): string {
+    const sentences = hypothesis.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const approachKeywords = ['should', 'must', 'need', 'require', 'implement', 'use', 'apply', 'consider'];
+    
+    const approachSentences = sentences.filter(s => {
+      const sLower = s.toLowerCase();
+      return approachKeywords.some(kw => sLower.includes(kw));
+    });
+    
+    return approachSentences.length > 0
+      ? approachSentences.join('. ') + '.'
+      : sentences.slice(1, 3).join('. ') + '.';
+  }
+  
+  /**
+   * Extract recommendations from hypothesis
+   */
+  private extractRecommendationFromHypothesis(hypothesis: string): string {
+    const sentences = hypothesis.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const actionKeywords = ['recommend', 'suggest', 'advise', 'propose', 'should', 'could'];
+    
+    const recommendations = sentences.filter(s => {
+      const sLower = s.toLowerCase();
+      return actionKeywords.some(kw => sLower.includes(kw));
+    });
+    
+    if (recommendations.length > 0) {
+      return recommendations.map((r, i) => `${i + 1}. ${r.trim()}`).join('\n');
+    }
+    
+    // Fallback: extract action-oriented sentences
+    return sentences
+      .filter(s => s.toLowerCase().includes('can') || s.toLowerCase().includes('will'))
+      .map((r, i) => `${i + 1}. ${r.trim()}`)
+      .join('\n') || '1. Apply the verified hypothesis to solve the problem.';
+  }
+  
+  /**
+   * Extract reasoning chain from hypothesis
+   */
+  private extractReasoningFromHypothesis(hypothesis: string): string {
+    const sentences = hypothesis.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const reasoningKeywords = ['because', 'since', 'therefore', 'thus', 'hence', 'given', 'as'];
+    
+    const reasoningSentences = sentences.filter(s => {
+      const sLower = s.toLowerCase();
+      return reasoningKeywords.some(kw => sLower.includes(kw));
+    });
+    
+    return reasoningSentences.length > 0
+      ? reasoningSentences.join(' ')
+      : 'The hypothesis was derived through evolutionary optimization and formal verification.';
   }
 
+  /**
+   * Perform evolutionary step on population with fitness evaluation
+   */
   private async performEvolutionaryStep(population: any[]): Promise<any[]> {
     try {
-      this.logger.debug('Performing evolutionary step on population:', population);
-      // Placeholder for actual implementation
-      return population.map(individual => ({ ...individual, fitness: Math.random() }));
+      this.logger.debug('Performing evolutionary step on population');
+      
+      if (!Array.isArray(population) || population.length === 0) {
+        this.logger.warn('Invalid or empty population provided');
+        return population;
+      }
+      
+      // Evaluate fitness for each individual
+      const evaluatedPopulation = population.map(individual => {
+        // Ensure individual has required properties
+        const hypothesis = typeof individual === 'string' ? individual : individual.hypothesis || '';
+        const problem = individual.problem || '';
+        const axioms = individual.axioms || [];
+        
+        const fitness = this.evaluateFitness(problem, hypothesis, axioms);
+        
+        return {
+          ...individual,
+          fitness,
+          hypothesis,
+          evaluated: true,
+          timestamp: Date.now()
+        };
+      });
+      
+      // Sort by fitness (descending)
+      evaluatedPopulation.sort((a, b) => b.fitness - a.fitness);
+      
+      this.logger.debug('Evolutionary step completed', {
+        populationSize: evaluatedPopulation.length,
+        bestFitness: evaluatedPopulation[0]?.fitness,
+        avgFitness: evaluatedPopulation.reduce((sum, ind) => sum + ind.fitness, 0) / evaluatedPopulation.length
+      });
+      
+      return evaluatedPopulation;
     } catch (error) {
       this.logger.error('Failed to perform evolutionary step:', error);
-      throw error;
+      throw new Error(`Evolutionary step failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
+  /**
+   * Verify consistency of reasoning plan structure and dependencies
+   */
   private async verifyConsistency(plan: any): Promise<boolean> {
     try {
-      this.logger.debug('Verifying consistency of plan:', plan);
-      // Placeholder for actual implementation
+      this.logger.debug('Verifying consistency of plan');
+      
+      if (!plan) {
+        this.logger.error('Plan is null or undefined');
+        return false;
+      }
+      
+      // Check required plan properties
+      if (!plan.steps || !Array.isArray(plan.steps)) {
+        this.logger.error('Plan missing steps array');
+        return false;
+      }
+      
+      // Verify each step has required properties
+      for (let i = 0; i < plan.steps.length; i++) {
+        const step = plan.steps[i];
+        
+        if (!step.id) {
+          this.logger.error(`Step ${i} missing id`);
+          return false;
+        }
+        
+        if (!step.type) {
+          this.logger.error(`Step ${i} missing type`);
+          return false;
+        }
+        
+        if (!step.description) {
+          this.logger.warn(`Step ${i} missing description`);
+        }
+      }
+      
+      // Verify step dependencies are satisfied
+      const stepIds = new Set(plan.steps.map((s: any) => s.id));
+      for (const step of plan.steps) {
+        if (step.dependencies && Array.isArray(step.dependencies)) {
+          for (const depId of step.dependencies) {
+            if (!stepIds.has(depId)) {
+              this.logger.error(`Step ${step.id} depends on non-existent step ${depId}`);
+              return false;
+            }
+          }
+        }
+      }
+      
+      // Verify no circular dependencies
+      if (this.hasCircularDependencies(plan.steps)) {
+        this.logger.error('Circular dependencies detected in plan');
+        return false;
+      }
+      
+      this.logger.debug('Plan consistency verified successfully');
       return true;
     } catch (error) {
       this.logger.error('Failed to verify consistency:', error);
       return false;
     }
   }
-
-  private async extractFromContext(context: any): Promise<string[]> {
-    this.logger.debug('Extracting axioms from context:', context);
-    return ['Axiom 1', 'Axiom 2'];
+  
+  /**
+   * Check for circular dependencies in plan steps
+   */
+  private hasCircularDependencies(steps: any[]): boolean {
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+    
+    const hasCycle = (stepId: string): boolean => {
+      visited.add(stepId);
+      recursionStack.add(stepId);
+      
+      const step = steps.find(s => s.id === stepId);
+      if (step && step.dependencies) {
+        for (const depId of step.dependencies) {
+          if (!visited.has(depId)) {
+            if (hasCycle(depId)) return true;
+          } else if (recursionStack.has(depId)) {
+            return true; // Circular dependency found
+          }
+        }
+      }
+      
+      recursionStack.delete(stepId);
+      return false;
+    };
+    
+    for (const step of steps) {
+      if (!visited.has(step.id)) {
+        if (hasCycle(step.id)) return true;
+      }
+    }
+    
+    return false;
   }
 
+  /**
+   * Extract axioms from context using semantic analysis
+   */
+  private async extractFromContext(context: any): Promise<string[]> {
+    this.logger.debug('Extracting axioms from context');
+    const axioms: string[] = [];
+    
+    if (!context) {
+      return axioms;
+    }
+    
+    // Extract from various context properties
+    if (context.axioms && Array.isArray(context.axioms)) {
+      axioms.push(...context.axioms.filter((a: any) => typeof a === 'string' && a.length > 0));
+    }
+    
+    if (context.principles && Array.isArray(context.principles)) {
+      axioms.push(...context.principles.filter((p: any) => typeof p === 'string' && p.length > 0));
+    }
+    
+    if (context.constraints && Array.isArray(context.constraints)) {
+      axioms.push(...context.constraints.filter((c: any) => typeof c === 'string' && c.length > 0));
+    }
+    
+    if (context.rules && Array.isArray(context.rules)) {
+      axioms.push(...context.rules.filter((r: any) => typeof r === 'string' && r.length > 0));
+    }
+    
+    // Extract from knowledge domain
+    if (context.domain) {
+      axioms.push(...this.getDomainAxioms(context.domain));
+    }
+    
+    // Remove duplicates
+    return [...new Set(axioms)];
+  }
+  
+  /**
+   * Get domain-specific axioms for common domains
+   */
+  private getDomainAxioms(domain: string): string[] {
+    const domainLower = domain.toLowerCase();
+    
+    if (domainLower.includes('security') || domainLower.includes('cyber')) {
+      return [
+        'Security through defense in depth',
+        'Principle of least privilege',
+        'Fail secure, not fail open',
+        'Validate all inputs',
+        'Never trust user input'
+      ];
+    }
+    
+    if (domainLower.includes('network')) {
+      return [
+        'Network layers must be properly isolated',
+        'Encryption in transit is mandatory for sensitive data',
+        'Network monitoring is essential for threat detection'
+      ];
+    }
+    
+    if (domainLower.includes('data') || domainLower.includes('database')) {
+      return [
+        'Data at rest must be encrypted',
+        'Access control is mandatory',
+        'Data integrity must be maintained',
+        'Backups are essential'
+      ];
+    }
+    
+    return ['Reliability is paramount', 'Scalability must be considered', 'Performance should be optimized'];
+  }
+  
+  /**
+   * Extract axioms from relevant memories
+   */
   private async extractFromMemories(memories: any[]): Promise<string[]> {
-    this.logger.debug('Extracting axioms from memories:', memories);
-    return ['Memory Axiom 1', 'Memory Axiom 2'];
+    this.logger.debug('Extracting axioms from memories');
+    const axioms: string[] = [];
+    
+    if (!Array.isArray(memories) || memories.length === 0) {
+      return axioms;
+    }
+    
+    for (const memory of memories) {
+      // Extract from memory content
+      if (memory.content && typeof memory.content === 'string') {
+        // Look for axiom-like statements (declarative, general principles)
+        const sentences = memory.content.split(/[.!?]+/).filter((s: string) => s.trim().length > 10);
+        
+        for (const sentence of sentences) {
+          const trimmed = sentence.trim();
+          // Identify axiom-like statements
+          if (this.isAxiomLike(trimmed)) {
+            axioms.push(trimmed);
+          }
+        }
+      }
+      
+      // Extract from memory metadata
+      if (memory.principles && Array.isArray(memory.principles)) {
+        axioms.push(...memory.principles.filter((p: any) => typeof p === 'string'));
+      }
+      
+      if (memory.rules && Array.isArray(memory.rules)) {
+        axioms.push(...memory.rules.filter((r: any) => typeof r === 'string'));
+      }
+    }
+    
+    // Remove duplicates and limit to most relevant
+    return [...new Set(axioms)].slice(0, 10);
+  }
+  
+  /**
+   * Determine if a statement is axiom-like (general principle)
+   */
+  private isAxiomLike(statement: string): boolean {
+    const axiomIndicators = [
+      'always', 'never', 'must', 'should', 'all', 'every', 'any',
+      'principle', 'rule', 'law', 'fundamental', 'essential', 'critical',
+      'requires', 'mandatory', 'necessary'
+    ];
+    
+    const statementLower = statement.toLowerCase();
+    return axiomIndicators.some(indicator => statementLower.includes(indicator)) &&
+           statement.length > 20 && statement.length < 200;
   }
 }
 

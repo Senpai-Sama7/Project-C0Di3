@@ -4,5 +4,11 @@
 *.mp4
 node_modules/
 
+# Compiled JavaScript files
+*.js
+!jest.config.js
+!test-*.js
+!bin/*.js
+
 # Advanced mode configuration
 .sensei
