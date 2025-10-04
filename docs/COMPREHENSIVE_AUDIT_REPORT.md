@@ -1,3 +1,8 @@
+---
+layout: default
+title: Comprehensive Audit Report
+---
+
 # Comprehensive Codebase Audit Report - Project C0Di3
 
 **Date:** 2024

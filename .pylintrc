@@ -1,0 +1,15 @@
+[MASTER]
+ignore=venv
+source-roots=services/log-analyzer
+max-line-length=100
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-function-docstring
+
+[TYPECHECK]
+ignored-modules=
+    flask,
+    pandas,
+    sklearn
