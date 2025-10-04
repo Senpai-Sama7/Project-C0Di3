@@ -1,6 +1,6 @@
 [MASTER]
 ignore=venv
-[FORMAT]
+source-roots=services/log-analyzer
 max-line-length=100
 
 [MESSAGES CONTROL]
