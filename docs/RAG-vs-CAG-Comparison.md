@@ -1,3 +1,8 @@
+---
+layout: default
+title: RAG vs CAG Comparison
+---
+
 # RAG vs CAG: Understanding When to Use Each Approach
 
 ## Overview

@@ -1,0 +1,44 @@
+# GitHub Pages configuration for Project-C0Di3 documentation
+# Ensures deterministic builds and excludes development artifacts.
+
+name: Project C0Di3 Docs
+description: Documentation hub for the Project-C0Di3 agent ecosystem.
+url: ""
+baseurl: ""
+
+markdown: kramdown
+theme: minima
+plugins: []
+
+exclude:
+  - node_modules
+  - coverage
+  - evidence
+  - fixes
+  - memory
+  - monitoring
+  - data
+  - integrations
+  - llama.cpp
+  - docs/*.ipynb
+  - README.md
+  - REALITY_CHECKLIST.txt
+  - features.json
+  - sha256sums.txt
+  - scripts
+  - services/log-analyzer/requirements.txt
+  - services/log-analyzer/setup.py
+  - requirements
+  - tools
+  - bin
+  - assets/cyber-agent-logo.jpg
+
+# Provide default layout metadata for documentation pages.
+defaults:
+  - scope:
+      path: "docs"
+      type: "pages"
+    values:
+      layout: default
+
+permalink: pretty

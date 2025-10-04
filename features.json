@@ -46,5 +46,21 @@
     "expected": "tsc exits 0",
     "evidence": "evidence/npm-build.log",
     "status": "VERIFIED"
+  },
+  {
+    "id": "F7",
+    "feature": "Pylint runs against Python services only",
+    "command": "python3 -m pylint services/prompt_enhancer.py services/log-analyzer",
+    "expected": "pylint exits 0 with score 10.00/10",
+    "evidence": "evidence/pylint.log",
+    "status": "VERIFIED"
+  },
+  {
+    "id": "F8",
+    "feature": "Documentation markdown files include YAML front matter",
+    "command": "python - <<'PY' | tee evidence/docs-front-matter.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = text[0:1] == ['---'] and 'layout:' in text[1] and 'title:' in text[2]\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
+    "expected": "all docs/*.md lines report OK",
+    "evidence": "evidence/docs-front-matter.txt",
+    "status": "VERIFIED"
   }
 ]

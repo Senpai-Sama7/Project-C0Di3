@@ -1,3 +1,8 @@
+---
+layout: default
+title: Enhancement Summary
+---
+
 # Project C0Di3 Enhancement Summary
 
 ## Executive Summary

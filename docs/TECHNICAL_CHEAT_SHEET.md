@@ -1,3 +1,8 @@
+---
+layout: default
+title: Technical Cheat Sheet
+---
+
 # Core Agent Technical Cheat Sheet
 
 [![Technical Users](https://img.shields.io/badge/Technical_Users-blue)](https://github.com/your-repo)

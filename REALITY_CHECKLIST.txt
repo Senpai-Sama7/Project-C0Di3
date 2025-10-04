@@ -4,3 +4,5 @@
 - [x] F4 auth-stored-hash — VERIFIED (credential store persists salted hash and salt only)
 - [x] F5 auth-legacy-migration — VERIFIED (legacy records without hashes load and trigger forced reset warnings)
 - [x] F6 npm-build — VERIFIED (npm run build exits 0)
+- [x] F7 python-pylint-targets — VERIFIED (python3 -m pylint services/prompt_enhancer.py services/log-analyzer)
+- [x] F8 docs-front-matter — VERIFIED (all docs/*.md report OK for YAML front matter)

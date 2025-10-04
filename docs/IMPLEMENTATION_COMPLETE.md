@@ -1,3 +1,8 @@
+---
+layout: default
+title: Implementation Complete
+---
+
 # Project C0Di3 - Complete Implementation Summary
 
 ## Executive Summary

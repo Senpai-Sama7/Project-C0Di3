@@ -1,3 +1,8 @@
+---
+layout: default
+title: Implementation Guide
+---
+
 # Implementation Guide - Project C0Di3 Enhancements
 
 ## Overview

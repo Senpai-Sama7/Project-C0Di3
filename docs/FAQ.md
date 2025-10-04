@@ -1,3 +1,8 @@
+---
+layout: default
+title: Core Agent FAQ
+---
+
 # Core Agent FAQ
 
 [![FAQ](https://img.shields.io/badge/FAQ-blue)](https://github.com/your-repo)
