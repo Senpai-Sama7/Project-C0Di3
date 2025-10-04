@@ -55,6 +55,7 @@ var __rest = (this && this.__rest) || function (s, e) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = exports.UserRole = void 0;
 const logger_1 = require("../utils/logger");
+const rate_limiter_1 = require("../utils/rate-limiter");
 const crypto = __importStar(require("crypto"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -77,6 +78,11 @@ class AuthService {
         this.eventBus = eventBus;
         this.logger = new logger_1.Logger('AuthService');
         this.config = config;
+        // Initialize rate limiters
+        // Auth: 5 attempts per minute per IP
+        this.authRateLimiter = new rate_limiter_1.TokenBucketRateLimiter(5, 5 / 60);
+        // Token refresh: 10 per minute
+        this.tokenRefreshRateLimiter = new rate_limiter_1.TokenBucketRateLimiter(10, 10 / 60);
         // Initialize file paths
         this.auditLogFile = path.join(process.cwd(), 'data', 'logs', 'audit.log');
         this.usersFile = path.join(process.cwd(), 'data', 'auth', 'users.json');
@@ -95,6 +101,11 @@ class AuthService {
      */
     authenticate(username, password, ipAddress, userAgent) {
         return __awaiter(this, void 0, void 0, function* () {
+            // Apply rate limiting
+            if (!this.authRateLimiter.consume(1)) {
+                this.logger.warn(`Rate limit exceeded for authentication from ${ipAddress || 'unknown'}`);
+                return { success: false, error: 'Too many authentication attempts. Please try again later.' };
+            }
             const startTime = Date.now();
             const sessionId = this.generateSessionId();
             try {
@@ -182,6 +193,7 @@ class AuthService {
                 return {
                     success: true,
                     token,
+                    refreshToken: session.refreshToken,
                     session: this.cloneSession(session),
                     user: this.toPublicUser(user)
                 };
@@ -242,6 +254,84 @@ class AuthService {
                     return { valid: false, error: 'Invalid token signature' };
                 }
                 return { valid: false, error: 'Invalid token' };
+            }
+        });
+    }
+    /**
+     * Refresh an access token using a refresh token
+     */
+    refreshAccessToken(refreshToken) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Apply rate limiting
+            if (!this.tokenRefreshRateLimiter.consume(1)) {
+                this.logger.warn('Rate limit exceeded for token refresh');
+                return { success: false, error: 'Too many refresh attempts. Please try again later.' };
+            }
+            try {
+                // Find session with matching refresh token using constant-time comparison
+                let matchingSession = null;
+                for (const session of this.sessions.values()) {
+                    if (session.refreshToken && session.isActive) {
+                        try {
+                            // Use constant-time comparison to prevent timing attacks
+                            const isMatch = crypto.timingSafeEqual(Buffer.from(session.refreshToken), Buffer.from(refreshToken));
+                            if (isMatch) {
+                                matchingSession = session;
+                                break;
+                            }
+                        }
+                        catch (error) {
+                            // Buffer lengths don't match, continue to next session
+                            continue;
+                        }
+                    }
+                }
+                if (!matchingSession) {
+                    this.logger.warn('Invalid refresh token provided');
+                    return { success: false, error: 'Invalid refresh token' };
+                }
+                // Check if refresh token has expired
+                if (matchingSession.refreshTokenExpiry && matchingSession.refreshTokenExpiry < new Date()) {
+                    matchingSession.isActive = false;
+                    this.saveSessions();
+                    this.logger.warn(`Refresh token expired for session: ${matchingSession.id}`);
+                    return { success: false, error: 'Refresh token expired' };
+                }
+                // Check if user still exists and is active
+                const user = this.users.get(matchingSession.userId);
+                if (!user || !user.isActive) {
+                    matchingSession.isActive = false;
+                    this.saveSessions();
+                    return { success: false, error: 'User account is not active' };
+                }
+                // Generate new JWT access token
+                const newToken = this.generateJWT(matchingSession);
+                // Optionally rotate refresh token for additional security
+                const newRefreshToken = crypto.randomBytes(32).toString('hex');
+                const refreshTokenExpiration = this.config.refreshTokenExpiration || 7 * 24 * 60 * 60;
+                matchingSession.refreshToken = newRefreshToken;
+                matchingSession.refreshTokenExpiry = new Date(Date.now() + refreshTokenExpiration * 1000);
+                matchingSession.lastActivity = new Date();
+                this.saveSessions();
+                yield this.logAuditEvent({
+                    userId: matchingSession.userId,
+                    username: matchingSession.username,
+                    action: 'TOKEN_REFRESH',
+                    resource: 'auth',
+                    details: { sessionId: matchingSession.id },
+                    sessionId: matchingSession.id,
+                    success: true,
+                    duration: 0
+                });
+                return {
+                    success: true,
+                    token: newToken,
+                    refreshToken: newRefreshToken
+                };
+            }
+            catch (error) {
+                this.logger.error('Token refresh error', error);
+                return { success: false, error: 'Token refresh failed' };
             }
         });
     }
@@ -650,6 +740,10 @@ class AuthService {
         return Object.assign(Object.assign({}, session), { createdAt: new Date(session.createdAt), lastActivity: new Date(session.lastActivity) });
     }
     createSession(user, ipAddress, userAgent) {
+        // Generate refresh token
+        const refreshToken = crypto.randomBytes(32).toString('hex');
+        const refreshTokenExpiration = this.config.refreshTokenExpiration || 7 * 24 * 60 * 60; // 7 days default
+        const refreshTokenExpiry = new Date(Date.now() + refreshTokenExpiration * 1000);
         const session = {
             id: this.generateSessionId(),
             userId: user.id,
@@ -659,7 +753,9 @@ class AuthService {
             ipAddress,
             userAgent,
             permissions: user.permissions,
-            isActive: true
+            isActive: true,
+            refreshToken,
+            refreshTokenExpiry
         };
         this.sessions.set(session.id, session);
         this.saveSessions();

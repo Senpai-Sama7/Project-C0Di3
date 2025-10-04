@@ -1,10 +1,15 @@
 import axios from 'axios';
 import { Logger } from '../utils/logger';
+import { TokenBucketRateLimiter } from '../utils/rate-limiter';
+import { CircuitBreaker, withRetry } from '../utils/error-handling';
 
 export interface LLMServiceOptions {
   apiUrl?: string;
   promptEnhancerUrl?: string;
   timeout?: number;
+  rateLimitRequestsPerSecond?: number;
+  circuitBreakerThreshold?: number;
+  circuitBreakerTimeout?: number;
 }
 
 export class LLMService {
@@ -12,6 +17,8 @@ export class LLMService {
   private promptEnhancerUrl?: string;
   private timeout: number;
   private logger: Logger;
+  private rateLimiter: TokenBucketRateLimiter;
+  private circuitBreaker: CircuitBreaker;
 
   constructor(options: LLMServiceOptions = {}) {
     this.logger = new Logger('LLMService');
@@ -43,7 +50,20 @@ export class LLMService {
 
     this.timeout = options.timeout || 15000;
 
-    this.logger.info(`LLMService initialized. API URL: ${this.apiUrl}, Prompt Enhancer URL: ${this.promptEnhancerUrl || 'Not configured'}`);
+    // Initialize rate limiter (default: 10 requests per second)
+    const rpsLimit = options.rateLimitRequestsPerSecond || 10;
+    this.rateLimiter = new TokenBucketRateLimiter(rpsLimit * 2, rpsLimit);
+    
+    // Initialize circuit breaker (default: 5 failures, 60s timeout)
+    const cbThreshold = options.circuitBreakerThreshold || 5;
+    const cbTimeout = options.circuitBreakerTimeout || 60000;
+    this.circuitBreaker = new CircuitBreaker({
+      failureThreshold: cbThreshold,
+      resetTimeoutMs: cbTimeout,
+      halfOpenRequests: 1
+    });
+
+    this.logger.info(`LLMService initialized. API URL: ${this.apiUrl}, Prompt Enhancer URL: ${this.promptEnhancerUrl || 'Not configured'}, Rate Limit: ${rpsLimit} req/s`);
   }
 
   /**
@@ -72,22 +92,38 @@ export class LLMService {
    * Send a prompt to llama.cpp and get a completion
    */
   async complete(prompt: string, opts: { n_predict?: number; temperature?: number; stop?: string[] } = {}): Promise<string> {
-    try {
-      const response = await axios.post(
-        `${this.apiUrl}/completion`,
-        {
-          prompt,
-          n_predict: opts.n_predict || 256,
-          temperature: opts.temperature || 0.7,
-          stream: false,
-          stop: opts.stop || undefined
+    // Apply rate limiting
+    await this.rateLimiter.wait(1);
+    
+    // Execute with circuit breaker and retry logic
+    return await this.circuitBreaker.execute(async () => {
+      return withRetry(
+        async () => {
+          const response = await axios.post(
+            `${this.apiUrl}/completion`,
+            {
+              prompt,
+              n_predict: opts.n_predict || 256,
+              temperature: opts.temperature || 0.7,
+              stream: false,
+              stop: opts.stop || undefined
+            },
+            { timeout: this.timeout }
+          );
+          return response.data.content;
         },
-        { timeout: this.timeout }
+        {
+          maxRetries: 3,
+          initialDelayMs: 1000,
+          maxDelayMs: 10000,
+          backoffMultiplier: 2,
+          retryableErrors: (error: Error) => {
+            const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED'];
+            return retryableCodes.some(code => error.message.includes(code));
+          }
+        }
       );
-      return response.data.content;
-    } catch (err: any) {
-      throw new Error(`LLMService: ${err.message}`);
-    }
+    });
   }
 
   /**

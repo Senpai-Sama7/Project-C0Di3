@@ -10,6 +10,7 @@ import { ProceduralMemory } from './procedural-memory';
 import { SemanticMemory } from './semantic-memory';
 import { ChromaDBVectorStore } from './stores/chromadb-store';
 import { InMemoryVectorStore } from './stores/inmemory-store';
+import { HNSWVectorStore } from './stores/hnsw-store';
 import { PostgresVectorStore } from './stores/postgres-store';
 import { VectorStore } from './vector-store';
 import { WorkingMemory } from './working-memory';
@@ -87,7 +88,21 @@ export class MemorySystem {
       case 'chromadb':
         return new ChromaDBVectorStore();
       case 'inmemory':
-        return new InMemoryVectorStore();
+        // Use HNSW for in-memory with better performance
+        return new HNSWVectorStore({
+          M: 16,
+          efConstruction: 200,
+          efSearch: 50,
+          persistencePath: path.join(this.persistencePath, 'hnsw-index')
+        });
+      case 'hnsw':
+        // Explicit HNSW option
+        return new HNSWVectorStore({
+          M: options.hnswM || 16,
+          efConstruction: options.hnswEfConstruction || 200,
+          efSearch: options.hnswEfSearch || 50,
+          persistencePath: path.join(this.persistencePath, 'hnsw-index')
+        });
       case 'postgres':
         if (!options.connectionString) {
           throw new Error('PostgresVectorStore requires a connectionString');
@@ -325,6 +340,126 @@ export class MemorySystem {
   }
 
   /**
+   * Batch store multiple memory entries efficiently
+   * Reduces overhead by batching operations to vector store
+   */
+  async storeBatch(dataItems: any[]): Promise<{ success: number; failed: number; errors: Error[] }> {
+    if (dataItems.length === 0) {
+      return { success: 0, failed: 0, errors: [] };
+    }
+
+    this.logger.info(`Batch storing ${dataItems.length} memory entries...`);
+    const startTime = Date.now();
+    
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as Error[]
+    };
+
+    const timestamp = Date.now();
+    const entries = dataItems.map((data, index) => ({
+      ...data,
+      timestamp,
+      id: `memory-${timestamp}-${index}-${Math.random().toString(36).substr(2, 9)}`
+    }));
+
+    // Separate entries by type for batch processing
+    const episodicEntries = entries.filter(e => e.type === 'conversation' || !e.type);
+    const semanticEntries = entries.filter(e => e.type === 'fact' || e.type === 'knowledge');
+
+    try {
+      // Batch store in episodic memory
+      for (const entry of episodicEntries) {
+        try {
+          await this.episodicMemory.add(entry);
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
+
+      // Batch store in semantic memory
+      for (const entry of semanticEntries) {
+        try {
+          await this.semanticMemory.add(entry);
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
+
+      // Batch store in vector store (more efficient)
+      const documents = entries.map(entry => ({
+        id: entry.id,
+        text: typeof entry.input === 'string' ? entry.input : JSON.stringify(entry.input),
+        metadata: { type: entry.type || 'conversation', timestamp: entry.timestamp }
+      }));
+
+      try {
+        await this.vectorStore.addDocuments(documents);
+      } catch (error) {
+        this.logger.error('Error batch storing in vector store:', error);
+        results.errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.info(`Batch store completed in ${duration}ms: ${results.success} success, ${results.failed} failed`);
+    } catch (error) {
+      this.logger.error('Error during batch store:', error);
+      results.errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    return results;
+  }
+
+  /**
+   * Batch retrieve multiple memory entries efficiently
+   */
+  async retrieveBatch(queries: string[], options: RetrieveOptions = {}): Promise<Map<string, any[]>> {
+    if (queries.length === 0) {
+      return new Map();
+    }
+
+    this.logger.info(`Batch retrieving ${queries.length} memory queries...`);
+    const startTime = Date.now();
+    
+    const results = new Map<string, any[]>();
+
+    try {
+      // Process queries in parallel with concurrency limit
+      const CONCURRENCY = 5;
+      for (let i = 0; i < queries.length; i += CONCURRENCY) {
+        const batch = queries.slice(i, i + CONCURRENCY);
+        const batchResults = await Promise.all(
+          batch.map(async (query) => {
+            try {
+              const result = await this.retrieveRelevantMemories(query, options);
+              return { query, memories: result.memories };
+            } catch (error) {
+              this.logger.error(`Error retrieving memories for query "${query}":`, error);
+              return { query, memories: [] };
+            }
+          })
+        );
+
+        for (const { query, memories } of batchResults) {
+          results.set(query, memories);
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.info(`Batch retrieve completed in ${duration}ms for ${queries.length} queries`);
+    } catch (error) {
+      this.logger.error('Error during batch retrieve:', error);
+    }
+
+    return results;
+  }
+
+  /**
    * Persist all memory to storage
    */
   async persist(): Promise<void> {
@@ -396,10 +531,14 @@ export interface MemorySystemOptions {
   persistencePath?: string;
   cacheSize?: number;
   cacheTTL?: number;
-  vectorStoreType?: 'chromadb' | 'inmemory' | 'postgres';
+  vectorStoreType?: 'chromadb' | 'inmemory' | 'postgres' | 'hnsw';
   connectionString?: string;
   workingMemoryCapacity?: number;
   encryptionKey?: string; // Encryption key for memory persistence
+  // HNSW-specific options
+  hnswM?: number; // Maximum connections per layer (default: 16)
+  hnswEfConstruction?: number; // Construction search depth (default: 200)
+  hnswEfSearch?: number; // Search depth (default: 50)
 }
 
 export interface RetrieveOptions {
