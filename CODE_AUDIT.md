@@ -201,9 +201,13 @@ This section provides a prioritized list of recommendations to address the findi
     // In loadUsers method
     private async loadUsers(): Promise<void> { // Make method async
       try {
-        if (fs.existsSync(this.usersFile)) { // existsSync is ok for startup
+        try {
+          await fs.access(this.usersFile); // Asynchronously check if file exists
           const data = await fs.readFile(this.usersFile, 'utf8'); // Use await
           // ...
+        } catch (err) {
+          if (err.code !== 'ENOENT') throw err; // Only ignore file-not-found
+          // File does not exist; handle accordingly (e.g., initialize empty users)
         }
       } //...
     }
