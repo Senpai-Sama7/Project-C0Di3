@@ -42,23 +42,29 @@ fi
 echo -e "\n[3/6] LLVM IR extraction and Alive2 verification..."
 shopt -s globstar nullglob
 IR_COUNT=0
-for obj in build/**/*.o 2>/dev/null; do
-  echo "Processing $obj..." | tee -a "$PROOFS_LOG"
-  clang -S -emit-llvm "${obj%.o}.cpp" -o "${obj%.o}.ll" 2>&1 | tee -a "$PROOFS_LOG" || true
-  ((IR_COUNT++))
-done
+if [ -d build ]; then
+  for obj in build/**/*.o; do
+    if [ -f "$obj" ]; then
+      echo "Processing $obj..." | tee -a "$PROOFS_LOG"
+      clang -S -emit-llvm "${obj%.o}.cpp" -o "${obj%.o}.ll" 2>&1 | tee -a "$PROOFS_LOG" || true
+      ((IR_COUNT++))
+    fi
+  done
+fi
 
 # Alive2 translation validation if IR is present
 if [ "$IR_COUNT" -gt 0 ]; then
   echo "Found $IR_COUNT IR files, running Alive2..." | tee -a "$PROOFS_LOG"
-  for ll in build/**/*.ll 2>/dev/null; do
-    echo "Verifying $ll with Alive2..." | tee -a "$PROOFS_LOG"
-    if command -v opt-alive-test.sh &> /dev/null; then
-      opt-alive-test.sh -passes=instcombine "$ll" 2>&1 | tee -a "$PROOFS_LOG" || {
-        echo "WARNING: Alive2 validation failed for $ll" | tee -a "$PROOFS_LOG"
-      }
-    else
-      echo "Alive2 not available, skipping validation" | tee -a "$PROOFS_LOG"
+  for ll in build/**/*.ll; do
+    if [ -f "$ll" ]; then
+      echo "Verifying $ll with Alive2..." | tee -a "$PROOFS_LOG"
+      if command -v opt-alive-test.sh &> /dev/null; then
+        opt-alive-test.sh -passes=instcombine "$ll" 2>&1 | tee -a "$PROOFS_LOG" || {
+          echo "WARNING: Alive2 validation failed for $ll" | tee -a "$PROOFS_LOG"
+        }
+      else
+        echo "Alive2 not available, skipping validation" | tee -a "$PROOFS_LOG"
+      fi
     fi
   done
 else
