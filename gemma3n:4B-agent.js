@@ -63,100 +63,188 @@ const log_analysis_service_1 = require("./services/log-analysis-service");
 const tool_registry_1 = require("./tools/tool-registry");
 const logger_1 = require("./utils/logger");
 const cag_service_1 = require("./services/cag-service");
+const di_container_1 = require("./utils/di-container");
 /**
  * GemmaAgent - Core autonomous agent with advanced reasoning, learning capabilities,
  * and integration with Gemma 3n LLM backend. Supports workspace features (MCP, VertexAI Search, etc.)
  */
 class GemmaAgent {
-    constructor(config) {
-        var _a, _b, _c, _d, _e;
+    constructor(config, container) {
+        var _a, _b, _c, _d;
         this.mcpEnabled = false;
         this.vertexAIEnabled = false;
+        if (config instanceof di_container_1.Container && !container) {
+            container = config;
+            config = undefined;
+        }
+        const { container: resolvedContainer, configManager } = this.setupContainer(config, container);
+        this.container = resolvedContainer;
+        this.configManager = configManager;
         // Initialize session and workspace integration
         this.sessionId = (config === null || config === void 0 ? void 0 : config.sessionId) || `session-${Date.now()}`;
         this.chatLogFile = (_a = config === null || config === void 0 ? void 0 : config.workspaceIntegration) === null || _a === void 0 ? void 0 : _a.chatLogFile;
         this.sessionLogFile = (_b = config === null || config === void 0 ? void 0 : config.workspaceIntegration) === null || _b === void 0 ? void 0 : _b.sessionLogFile;
         this.mcpEnabled = ((_c = config === null || config === void 0 ? void 0 : config.workspaceIntegration) === null || _c === void 0 ? void 0 : _c.mcpEnabled) || false;
         this.vertexAIEnabled = ((_d = config === null || config === void 0 ? void 0 : config.workspaceIntegration) === null || _d === void 0 ? void 0 : _d.vertexAIEnabled) || false;
-        // Initialize subsystems
-        this.configManager = (config === null || config === void 0 ? void 0 : config.configManager) || new config_manager_1.ConfigManager(config);
-        this.eventBus = new event_bus_1.EventBus();
-        this.logger = new logger_1.Logger(this.configManager.get('logging.level', 'info'));
-        // Encryption key for audit logs
+        this.logger = this.container.resolveSync(di_container_1.ServiceTokens.Logger);
+        this.eventBus = this.container.resolveSync(di_container_1.ServiceTokens.EventBus);
+        this.performanceMonitor = this.container.resolveSync(di_container_1.ServiceTokens.MetricsCollector);
+        if (this.chatLogFile) {
+            this.performanceMonitor.logToWorkspace = (data) => this.logToWorkspace('performance', data);
+        }
+        // Ensure encryption key exists before resolving audit service
         const encryptionKey = this.configManager.get('agent.encryptionKey') || process.env.AGENT_ENCRYPTION_KEY;
         if (!encryptionKey) {
             throw new Error('Encryption key for audit logs is not set. Please set AGENT_ENCRYPTION_KEY in environment or config.');
         }
-        this.auditService = new audit_service_1.AuditService(this.configManager.get('logging.auditLogDir', './data/logs'), this.eventBus, encryptionKey);
-        const logAnalyzerClient = new log_analyzer_client_1.LogAnalyzerClient(this.configManager.get('services.logAnalyzer.baseUrl', 'http://localhost:5001'), this.logger);
-        this.logAnalysisService = new log_analysis_service_1.LogAnalysisService(logAnalyzerClient, this.auditService, this.logger);
-        // Log session start to workspace logs
-        this.logToWorkspace('session_start', {
-            sessionId: this.sessionId,
-            timestamp: new Date().toISOString(),
-            mcpEnabled: this.mcpEnabled,
-            vertexAIEnabled: this.vertexAIEnabled
-        });
-        // Performance monitoring with workspace integration
-        this.performanceMonitor = new performance_monitor_1.PerformanceMonitor({
-            metrics: ['latency', 'tokenUsage', 'memoryUsage', 'toolExecutionTime', 'reasoningComplexity'],
-            eventBus: this.eventBus,
-            logToWorkspace: this.chatLogFile ? (data) => this.logToWorkspace('performance', data) : undefined
-        });
-        // Core AI capabilities - require real LLM client
+        this.auditService = this.container.resolveSync(di_container_1.ServiceTokens.AuditService);
+        this.logAnalysisService = this.container.resolveSync(di_container_1.ServiceTokens.LogAnalysisService);
         try {
-            this.client = new llama_cpp_client_1.LlamaCppClient(this.configManager.get('llm.apiUrl', (_e = process.env.LLM_API_URL) !== null && _e !== void 0 ? _e : 'http://localhost:8000'));
+            this.client = this.container.resolveSync(di_container_1.ServiceTokens.LLMClient);
             this.logger.info('LLM client initialized successfully');
         }
         catch (error) {
             this.logger.error('Failed to initialize LLM client:', error);
             throw new Error('LLM client is required. Please ensure llama.cpp server is running or configure a valid LLM endpoint.');
         }
-        // Initialize learn mode service after client is available
-        this.learnModeService = new learn_mode_service_1.LearnModeService(this.client, this.logger, this.eventBus);
-        // Memory systems
-        this.memory = new memory_system_1.MemorySystem({
-            vectorStoreType: this.configManager.get('memory.vectorStore', 'inmemory'),
-            persistencePath: this.configManager.get('memory.persistencePath', './data/memory'),
-            cacheSize: this.configManager.get('memory.cacheSize', 10000),
-            cacheTTL: this.configManager.get('memory.cacheTTL', 3600),
-            workingMemoryCapacity: this.configManager.get('memory.workingMemoryCapacity', 10),
-            eventBus: this.eventBus
+        this.learnModeService = this.container.resolveSync(di_container_1.ServiceTokens.LearnModeService);
+        this.memory = this.container.resolveSync(di_container_1.ServiceTokens.MemorySystem);
+        this.bookIngestionService = this.container.resolveSync(di_container_1.ServiceTokens.BookIngestionService);
+        this.cybersecurityKnowledgeService = this.container.resolveSync(di_container_1.ServiceTokens.CybersecurityKnowledgeService);
+        this.cagService = this.container.resolveSync(di_container_1.ServiceTokens.CAGService);
+        this.healthMonitoringService = this.container.resolveSync(di_container_1.ServiceTokens.HealthMonitoringService);
+        this.toolRegistry = this.container.resolveSync(di_container_1.ServiceTokens.ToolRegistry);
+        this.pluginManager = this.container.resolveSync(di_container_1.ServiceTokens.PluginManager);
+        this.reasoningEngine = this.container.resolveSync(di_container_1.ServiceTokens.ReasoningEngine);
+        this.feedbackLoop = this.container.resolveSync(di_container_1.ServiceTokens.FeedbackLoop);
+        this.contextManager = this.container.resolveSync(di_container_1.ServiceTokens.ContextManager);
+        // Log session start to workspace logs
+        void this.logToWorkspace('session_start', {
+            sessionId: this.sessionId,
+            timestamp: new Date().toISOString(),
+            mcpEnabled: this.mcpEnabled,
+            vertexAIEnabled: this.vertexAIEnabled
         });
-        this.bookIngestionService = new book_ingestion_service_1.BookIngestionService(this.memory.getVectorStore());
-        // Initialize cybersecurity knowledge service
-        this.cybersecurityKnowledgeService = new cybersecurity_knowledge_service_1.CybersecurityKnowledgeService(this.memory, this.client, this.eventBus);
-        // Initialize CAG service
-        this.cagService = new cag_service_1.CAGService(this.client, this.cybersecurityKnowledgeService, this.eventBus);
-        // Initialize health monitoring service after memory is available
-        this.healthMonitoringService = new health_monitoring_service_1.HealthMonitoringService(this.eventBus, this.logger, this.performanceMonitor, this.memory, this.client);
-        // Tools and extensions
-        this.toolRegistry = new tool_registry_1.ToolRegistry(this.eventBus);
-        this.pluginManager = new plugin_manager_1.PluginManager({
-            registry: this.toolRegistry,
-            allowedDirectories: this.configManager.get('plugins.allowedDirectories', ['./plugins']),
-            eventBus: this.eventBus
-        });
-        // Advanced reasoning and learning
-        this.reasoningEngine = new reasoning_engine_1.ReasoningEngine({
-            memory: this.memory,
-            client: this.client,
-            eventBus: this.eventBus,
-            zeroShotEnabled: this.configManager.get('reasoning.zeroShotEnabled', true),
-            cybersecurityKnowledgeService: this.cybersecurityKnowledgeService
-        });
-        this.feedbackLoop = new feedback_loop_1.FeedbackLoop({
-            memory: this.memory,
-            reasoningEngine: this.reasoningEngine,
-            eventBus: this.eventBus,
-            learningRate: this.configManager.get('learning.learningRate', 0.1)
-        });
-        // Context management
-        this.contextManager = new context_manager_1.ContextManager();
         // Register event handlers
         this.registerEventHandlers();
         // Initialize subsystems
         this.initialize();
+    }
+    setupContainer(config, existingContainer) {
+        const container = existingContainer !== null && existingContainer !== void 0 ? existingContainer : new di_container_1.Container();
+        let configManager;
+        if (container.has(di_container_1.ServiceTokens.Config)) {
+            configManager = container.resolveSync(di_container_1.ServiceTokens.Config);
+        }
+        else if ((config === null || config === void 0 ? void 0 : config.configManager) instanceof config_manager_1.ConfigManager) {
+            configManager = config.configManager;
+            container.registerValue(di_container_1.ServiceTokens.Config, configManager);
+        }
+        else {
+            configManager = new config_manager_1.ConfigManager(config);
+            container.registerValue(di_container_1.ServiceTokens.Config, configManager);
+        }
+        if (!container.has(di_container_1.ServiceTokens.EventBus)) {
+            container.register(di_container_1.ServiceTokens.EventBus, () => new event_bus_1.EventBus());
+        }
+        if (!container.has(di_container_1.ServiceTokens.Logger)) {
+            container.register(di_container_1.ServiceTokens.Logger, () => { var _a; return new logger_1.Logger('GemmaAgent', (_a = configManager.get('logging.level', 'info')) !== null && _a !== void 0 ? _a : 'info'); });
+        }
+        if (!container.has(di_container_1.ServiceTokens.LLMClient)) {
+            container.register(di_container_1.ServiceTokens.LLMClient, () => { var _a; return new llama_cpp_client_1.LlamaCppClient(configManager.get('llm.apiUrl', (_a = process.env.LLM_API_URL) !== null && _a !== void 0 ? _a : 'http://localhost:8000')); });
+        }
+        if (!container.has(di_container_1.ServiceTokens.ToolRegistry)) {
+            container.register(di_container_1.ServiceTokens.ToolRegistry, (eventBus) => new tool_registry_1.ToolRegistry(eventBus), 'singleton', [di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.MetricsCollector)) {
+            container.register(di_container_1.ServiceTokens.MetricsCollector, (eventBus) => new performance_monitor_1.PerformanceMonitor({
+                metrics: ['latency', 'tokenUsage', 'memoryUsage', 'toolExecutionTime', 'reasoningComplexity'],
+                eventBus,
+                enableLogging: configManager.get('monitoring.enableLogging', false)
+            }), 'singleton', [di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.MemorySystem)) {
+            container.register(di_container_1.ServiceTokens.MemorySystem, (eventBus) => new memory_system_1.MemorySystem({
+                vectorStoreType: configManager.get('memory.vectorStore', 'inmemory'),
+                persistencePath: configManager.get('memory.persistencePath', './data/memory'),
+                cacheSize: configManager.get('memory.cacheSize', 10000),
+                cacheTTL: configManager.get('memory.cacheTTL', 3600),
+                workingMemoryCapacity: configManager.get('memory.workingMemoryCapacity', 10),
+                encryptionKey: configManager.get('memory.encryptionKey', process.env.MEMORY_ENCRYPTION_KEY),
+                eventBus
+            }), 'singleton', [di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.ContextManager)) {
+            container.register(di_container_1.ServiceTokens.ContextManager, () => new context_manager_1.ContextManager());
+        }
+        if (!container.has(di_container_1.ServiceTokens.CybersecurityKnowledgeService)) {
+            container.register(di_container_1.ServiceTokens.CybersecurityKnowledgeService, (memory, client, eventBus) => new cybersecurity_knowledge_service_1.CybersecurityKnowledgeService(memory, client, eventBus, configManager.get('cybersecurity.booksPath', './memory/cybersecurity-books')), 'singleton', [di_container_1.ServiceTokens.MemorySystem, di_container_1.ServiceTokens.LLMClient, di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.CAGService)) {
+            container.register(di_container_1.ServiceTokens.CAGService, (client, knowledgeService, eventBus) => new cag_service_1.CAGService(client, knowledgeService, eventBus), 'singleton', [di_container_1.ServiceTokens.LLMClient, di_container_1.ServiceTokens.CybersecurityKnowledgeService, di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.BookIngestionService)) {
+            container.register(di_container_1.ServiceTokens.BookIngestionService, (memory) => new book_ingestion_service_1.BookIngestionService(memory.getVectorStore()), 'singleton', [di_container_1.ServiceTokens.MemorySystem]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.ReasoningEngine)) {
+            container.register(di_container_1.ServiceTokens.ReasoningEngine, (memory, client, toolRegistry, eventBus, knowledgeService) => new reasoning_engine_1.ReasoningEngine({
+                memory,
+                client,
+                toolRegistry,
+                eventBus,
+                zeroShotEnabled: configManager.get('reasoning.zeroShotEnabled', true),
+                cybersecurityKnowledgeService: knowledgeService
+            }), 'singleton', [
+                di_container_1.ServiceTokens.MemorySystem,
+                di_container_1.ServiceTokens.LLMClient,
+                di_container_1.ServiceTokens.ToolRegistry,
+                di_container_1.ServiceTokens.EventBus,
+                di_container_1.ServiceTokens.CybersecurityKnowledgeService
+            ]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.FeedbackLoop)) {
+            container.register(di_container_1.ServiceTokens.FeedbackLoop, (memory, reasoning, eventBus) => new feedback_loop_1.FeedbackLoop({
+                memory,
+                reasoningEngine: reasoning,
+                eventBus,
+                learningRate: configManager.get('learning.learningRate', 0.1)
+            }), 'singleton', [di_container_1.ServiceTokens.MemorySystem, di_container_1.ServiceTokens.ReasoningEngine, di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.PluginManager)) {
+            container.register(di_container_1.ServiceTokens.PluginManager, (toolRegistry, eventBus) => new plugin_manager_1.PluginManager({
+                registry: toolRegistry,
+                allowedDirectories: configManager.get('plugins.allowedDirectories', ['./plugins']),
+                eventBus
+            }), 'singleton', [di_container_1.ServiceTokens.ToolRegistry, di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.LearnModeService)) {
+            container.register(di_container_1.ServiceTokens.LearnModeService, (client, logger, eventBus) => new learn_mode_service_1.LearnModeService(client, logger, eventBus), 'singleton', [di_container_1.ServiceTokens.LLMClient, di_container_1.ServiceTokens.Logger, di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.HealthMonitoringService)) {
+            container.register(di_container_1.ServiceTokens.HealthMonitoringService, (eventBus, logger, performanceMonitor, memory, client) => new health_monitoring_service_1.HealthMonitoringService(eventBus, logger, performanceMonitor, memory, client), 'singleton', [
+                di_container_1.ServiceTokens.EventBus,
+                di_container_1.ServiceTokens.Logger,
+                di_container_1.ServiceTokens.MetricsCollector,
+                di_container_1.ServiceTokens.MemorySystem,
+                di_container_1.ServiceTokens.LLMClient
+            ]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.LogAnalyzerClient)) {
+            container.register(di_container_1.ServiceTokens.LogAnalyzerClient, (logger) => new log_analyzer_client_1.LogAnalyzerClient(configManager.get('services.logAnalyzer.baseUrl', 'http://localhost:5001'), logger), 'singleton', [di_container_1.ServiceTokens.Logger]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.AuditService)) {
+            container.register(di_container_1.ServiceTokens.AuditService, (eventBus) => {
+                const key = configManager.get('agent.encryptionKey') || process.env.AGENT_ENCRYPTION_KEY;
+                if (!key) {
+                    throw new Error('Encryption key for audit logs is not set. Please set AGENT_ENCRYPTION_KEY in environment or config.');
+                }
+                return new audit_service_1.AuditService(configManager.get('logging.auditLogDir', './data/logs'), eventBus, key);
+            }, 'singleton', [di_container_1.ServiceTokens.EventBus]);
+        }
+        if (!container.has(di_container_1.ServiceTokens.LogAnalysisService)) {
+            container.register(di_container_1.ServiceTokens.LogAnalysisService, (logAnalyzer, auditService, logger) => new log_analysis_service_1.LogAnalysisService(logAnalyzer, auditService, logger), 'singleton', [di_container_1.ServiceTokens.LogAnalyzerClient, di_container_1.ServiceTokens.AuditService, di_container_1.ServiceTokens.Logger]);
+        }
+        return { container, configManager };
     }
     registerEventHandlers() {
         this.eventBus.on('agent.request', (data) => this.performanceMonitor.startRequest(data.requestId));
