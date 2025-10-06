@@ -139,7 +139,7 @@ describe('Error Handling Utilities', () => {
         .mockRejectedValueOnce(new Error('fail 2'))
         .mockResolvedValue('success');
       
-      const result = await withRetry(fn, { maxRetries: 3, initialDelay: 10 });
+      const result = await withRetry(fn, { maxRetries: 3, initialDelayMs: 10 });
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(3);
     });
@@ -147,7 +147,7 @@ describe('Error Handling Utilities', () => {
     it('should fail after max retries exceeded', async () => {
       const fn = jest.fn().mockRejectedValue(new Error('persistent failure'));
       
-      await expect(withRetry(fn, { maxRetries: 2, initialDelay: 10 }))
+      await expect(withRetry(fn, { maxRetries: 2, initialDelayMs: 10 }))
         .rejects.toThrow('persistent failure');
       expect(fn).toHaveBeenCalledTimes(3); // initial + 2 retries
     });
