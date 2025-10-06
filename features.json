@@ -2,7 +2,7 @@
   {
     "id": "F1",
     "feature": "Admin authentication uses configured password",
-    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
+    "command": "npm run test:auth-reality-check",
     "expected": "auth-admin-login.outcome.success === true",
     "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
