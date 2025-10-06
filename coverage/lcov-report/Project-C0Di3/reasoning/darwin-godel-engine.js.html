@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.79% </span>
+                <span class="strong">2.1% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/390</span>
+                <span class='fraction'>8/380</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.31% </span>
+                <span class="strong">1.33% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/228</span>
+                <span class='fraction'>3/224</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">2.01% </span>
+                <span class="strong">2.35% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/348</span>
+                <span class='fraction'>8/339</span>
             </div>
         
             
@@ -840,16 +840,7 @@
 <a name='L775'></a><a href='#L775'>775</a>
 <a name='L776'></a><a href='#L776'>776</a>
 <a name='L777'></a><a href='#L777'>777</a>
-<a name='L778'></a><a href='#L778'>778</a>
-<a name='L779'></a><a href='#L779'>779</a>
-<a name='L780'></a><a href='#L780'>780</a>
-<a name='L781'></a><a href='#L781'>781</a>
-<a name='L782'></a><a href='#L782'>782</a>
-<a name='L783'></a><a href='#L783'>783</a>
-<a name='L784'></a><a href='#L784'>784</a>
-<a name='L785'></a><a href='#L785'>785</a>
-<a name='L786'></a><a href='#L786'>786</a>
-<a name='L787'></a><a href='#L787'>787</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L778'></a><a href='#L778'>778</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -859,6 +850,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
@@ -1290,17 +1282,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1650,6 +1632,7 @@ exports.DarwinGodelEngine = void 0;
 const event_bus_1 = require("../events/event-bus");
 const embedding_service_1 = require("../services/embedding-service");
 const logger_1 = require("../utils/logger");
+const vector_ops_1 = require("./vector-ops");
 /**
  * Darwin Gödel Machine - An advanced reasoning system combining evolutionary algorithms
  * with formal logic and self-verification capabilities
@@ -2074,20 +2057,10 @@ class DarwinGodelEngine {
     }
     /**
      * Calculate cosine similarity between two vectors
+     * Uses optimized implementation when FUSION_ON=1
      */
 <span class="fstat-no" title="function not covered" >    co</span>sineSimilarity(a, b) {
-        let dot = <span class="cstat-no" title="statement not covered" >0;</span>
-        let magA = <span class="cstat-no" title="statement not covered" >0;</span>
-        let magB = <span class="cstat-no" title="statement not covered" >0;</span>
-        const len = <span class="cstat-no" title="statement not covered" >Math.min(a.length, b.length);</span>
-<span class="cstat-no" title="statement not covered" >        for (let i = <span class="cstat-no" title="statement not covered" >0;</span> i &lt; len; i++) {</span>
-<span class="cstat-no" title="statement not covered" >            dot += a[i] * b[i];</span>
-<span class="cstat-no" title="statement not covered" >            magA += a[i] * a[i];</span>
-<span class="cstat-no" title="statement not covered" >            magB += b[i] * b[i];</span>
-        }
-<span class="cstat-no" title="statement not covered" >        magA = Math.sqrt(magA);</span>
-<span class="cstat-no" title="statement not covered" >        magB = Math.sqrt(magB);</span>
-<span class="cstat-no" title="statement not covered" >        return (magA &amp;&amp; magB) ? dot / (magA * magB) : 0;</span>
+<span class="cstat-no" title="statement not covered" >        return (0, vector_ops_1.cosineSimilarityAuto)(a, b);</span>
     }
     /**
      * Extract the final solution from the verified hypothesis with proper formatting
@@ -2428,7 +2401,7 @@ exports.DarwinGodelEngine = DarwinGodelEngine;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-04T21:56:15.261Z
+                at 2025-10-06T20:21:19.122Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -3,6 +3,8 @@
 *.zip
 *.mp4
 node_modules/
+coverage/
+package-lock.json
 
 # Compiled JavaScript files
 *.js
