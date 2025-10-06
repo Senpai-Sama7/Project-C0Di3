@@ -1,8 +1,8 @@
-- [x] F1 auth-admin-login — VERIFIED (admin authenticates with configured password)
-- [x] F2 auth-reject-bad-password — VERIFIED (invalid password rejected)
-- [x] F3 auth-signed-jwt — VERIFIED (tampered token rejected while valid token passes)
-- [x] F4 auth-stored-hash — VERIFIED (credential store persists salted hash and salt only)
-- [x] F5 auth-legacy-migration — VERIFIED (legacy records without hashes load and trigger forced reset warnings)
-- [x] F6 npm-build — VERIFIED (npm run build exits 0)
-- [x] F7 python-pylint-targets — VERIFIED (python3 -m pylint services/prompt_enhancer.py services/log-analyzer)
-- [x] F8 docs-front-matter — VERIFIED (all docs/*.md report OK for YAML front matter)
+- [x] F1 auth-admin-login — VERIFIED (admin authenticates with configured password) — evidence/auth-check-20251006-194119.json
+- [x] F2 auth-reject-bad-password — VERIFIED (invalid password rejected) — evidence/auth-check-20251006-194119.json
+- [x] F3 auth-signed-jwt — VERIFIED (tampered token rejected while valid token passes) — evidence/auth-check-20251006-194119.json
+- [x] F4 auth-stored-hash — VERIFIED (credential store persists salted hash and salt only) — evidence/auth-check-20251006-194119.json
+- [x] F5 auth-legacy-migration — VERIFIED (legacy records without hashes load and trigger forced reset warnings) — evidence/auth-check-20251006-194119.json
+- [x] F6 npm-build — VERIFIED (npm run build exits 0) — evidence/npm-build-20251006-194125.log
+- [x] F7 python-pylint-targets — VERIFIED (python3 -m pylint services/prompt_enhancer.py services/log-analyzer) — evidence/pylint-20251006-194141.log
+- [x] F8 docs-front-matter — VERIFIED (all docs/*.md report OK for YAML front matter) — evidence/docs-front-matter-20251006-194148.txt
