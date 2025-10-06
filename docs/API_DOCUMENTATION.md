@@ -1,3 +1,8 @@
+---
+layout: default
+title: Project C0Di3 API Documentation
+---
+
 # Project C0Di3 API Documentation
 
 **Version:** 1.0.0  

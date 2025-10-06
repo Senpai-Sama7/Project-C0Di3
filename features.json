@@ -4,7 +4,7 @@
     "feature": "Admin authentication uses configured password",
     "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
     "expected": "auth-admin-login.outcome.success === true",
-    "evidence": "evidence/auth-check.json",
+    "evidence": "evidence/auth-check-20250214.json",
     "status": "VERIFIED"
   },
   {
@@ -12,7 +12,7 @@
     "feature": "Invalid password attempts are rejected",
     "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
     "expected": "auth-reject-bad-password.outcome.success === false",
-    "evidence": "evidence/auth-check.json",
+    "evidence": "evidence/auth-check-20250214.json",
     "status": "VERIFIED"
   },
   {
@@ -20,7 +20,7 @@
     "feature": "JWTs are signed and tamper-evident",
     "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
     "expected": "auth-signed-jwt.outcome.tamperedResult.error === 'Invalid token signature'",
-    "evidence": "evidence/auth-check.json",
+    "evidence": "evidence/auth-check-20250214.json",
     "status": "VERIFIED"
   },
   {
@@ -28,7 +28,7 @@
     "feature": "Credential store persists salted password hash",
     "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
     "expected": "auth-stored-hash.outcome.passwordHash && auth-stored-hash.outcome.passwordSalt",
-    "evidence": "evidence/auth-check.json",
+    "evidence": "evidence/auth-check-20250214.json",
     "status": "VERIFIED"
   },
   {
@@ -36,7 +36,7 @@
     "feature": "Legacy user records without hashes migrate automatically",
     "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
     "expected": "auth-legacy-migration.outcome.migratedLogin === true && !auth-legacy-migration.outcome.retainedPlaintext",
-    "evidence": "evidence/auth-check.json",
+    "evidence": "evidence/auth-check-20250214.json",
     "status": "VERIFIED"
   },
   {
@@ -44,7 +44,7 @@
     "feature": "TypeScript project builds without syntax errors",
     "command": "npm run build",
     "expected": "tsc exits 0",
-    "evidence": "evidence/npm-build.log",
+    "evidence": "evidence/npm-build-20250214.log",
     "status": "VERIFIED"
   },
   {
@@ -52,15 +52,15 @@
     "feature": "Pylint runs against Python services only",
     "command": "python3 -m pylint services/prompt_enhancer.py services/log-analyzer",
     "expected": "pylint exits 0 with score 10.00/10",
-    "evidence": "evidence/pylint.log",
+    "evidence": "evidence/pylint-20250214.log",
     "status": "VERIFIED"
   },
   {
     "id": "F8",
     "feature": "Documentation markdown files include YAML front matter",
-    "command": "python - <<'PY' | tee evidence/docs-front-matter.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = False\n    if len(text) >= 4 and text[0] == '---' and text[3] == '---':\n        front_matter = '\\n'.join(text[1:3])\n        if 'layout:' in front_matter and 'title:' in front_matter:\n            status = True\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
+    "command": "python - <<'PY' | tee evidence/docs-front-matter-20250214.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = False\n    if len(text) >= 4 and text[0] == '---' and text[3] == '---':\n        front_matter = '\\n'.join(text[1:3])\n        if 'layout:' in front_matter and 'title:' in front_matter:\n            status = True\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
     "expected": "all docs/*.md lines report OK",
-    "evidence": "evidence/docs-front-matter.txt",
+    "evidence": "evidence/docs-front-matter-20250214.txt",
     "status": "VERIFIED"
   }
 ]

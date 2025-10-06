@@ -1,0 +1,108 @@
+[2025-10-04T22:31:49.212Z] [INFO] [AuthService] AuthService initialized
+[2025-10-04T22:31:49.929Z] [INFO] [AuthService] AuthService initialized
+[
+  {
+    "id": "auth-admin-login",
+    "description": "Admin authenticates with configured password",
+    "outcome": {
+      "success": true,
+      "hasSession": true,
+      "tokenLength": 239,
+      "userRole": "admin"
+    }
+  },
+  {
+    "id": "auth-reject-bad-password",
+    "description": "Invalid password is rejected",
+    "outcome": {
+      "success": false,
+      "error": "Invalid credentials"
+    }
+  },
+  {
+    "id": "auth-signed-jwt",
+    "description": "Valid token decodes, tampered token fails",
+    "outcome": {
+      "validToken": {
+        "valid": true,
+        "session": {
+          "id": "dbbbf1e418f87986e088fdba0ed68486",
+          "userId": "admin",
+          "username": "admin",
+          "createdAt": "2025-10-04T22:31:49.439Z",
+          "lastActivity": "2025-10-04T22:31:49.678Z",
+          "permissions": [
+            {
+              "resource": "*",
+              "action": "*"
+            }
+          ],
+          "isActive": true,
+          "refreshToken": "63e2f690e94a7fd5ba0239b584244534b8ab9bf40829c26d8931af92e96eddbf",
+          "refreshTokenExpiry": "2025-10-11T22:31:49.439Z"
+        },
+        "user": {
+          "id": "admin",
+          "username": "admin",
+          "role": "admin",
+          "permissions": [
+            {
+              "resource": "*",
+              "action": "*"
+            }
+          ],
+          "createdAt": "2025-10-04T22:31:49.210Z",
+          "lastLogin": "2025-10-04T22:31:49.439Z",
+          "isActive": true,
+          "failedLoginAttempts": 1
+        }
+      },
+      "tamperedResult": {
+        "valid": false,
+        "error": "Invalid token signature"
+      }
+    }
+  },
+  {
+    "id": "auth-stored-hash",
+    "description": "Stored user record contains hash and salt but no plaintext password",
+    "outcome": {
+      "id": "admin",
+      "username": "admin",
+      "role": "admin",
+      "permissions": [
+        {
+          "resource": "*",
+          "action": "*"
+        }
+      ],
+      "createdAt": "2025-10-04T22:31:49.210Z",
+      "lastLogin": "2025-10-04T22:31:49.439Z",
+      "isActive": true,
+      "failedLoginAttempts": 1,
+      "passwordHash": "41d07d17cbc163dc627eda4e184f26daba4a12e1e8deccab962d940a31cc7fc4",
+      "passwordSalt": "9004098c3f06f4a107b048342db3a702"
+    }
+  },
+  {
+    "id": "auth-context",
+    "description": "Temporary directory used for this verification run",
+    "outcome": {
+      "tmpDir": "/tmp/auth-reality-RBTovO",
+      "files": [
+        "sessions.json",
+        "users.json"
+      ]
+    }
+  },
+  {
+    "id": "auth-legacy-migration",
+    "description": "Legacy user records missing hashes are auto-migrated with warnings",
+    "outcome": {
+      "migratedLogin": true,
+      "storedHash": true,
+      "storedSalt": true,
+      "retainedPlaintext": false
+    }
+  }
+]
