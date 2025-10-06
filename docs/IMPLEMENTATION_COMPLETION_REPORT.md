@@ -1,3 +1,8 @@
+---
+layout: default
+title: Implementation Completion Report - Project C0Di3
+---
+
 # Implementation Completion Report - Project C0Di3
 
 **Date:** 2024  

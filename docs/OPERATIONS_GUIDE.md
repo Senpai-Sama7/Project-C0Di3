@@ -1,3 +1,8 @@
+---
+layout: default
+title: Operations Guide - Project C0Di3
+---
+
 # Operations Guide - Project C0Di3
 
 **Version:** 1.0.0  

@@ -1,3 +1,8 @@
+---
+layout: default
+title: Deployment Guide - Project C0Di3
+---
+
 # Deployment Guide - Project C0Di3
 
 **Version:** 1.0.0  
