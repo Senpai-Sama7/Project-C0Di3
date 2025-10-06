@@ -3,6 +3,7 @@ import { MemorySystem } from '../memory/memory-system';
 import { EmbeddingService } from '../services/embedding-service';
 import { LLMClient } from '../types';
 import { Logger } from '../utils/logger';
+import { cosineSimilarityAuto } from './vector-ops';
 
 /**
  * Darwin Gödel Machine - An advanced reasoning system combining evolutionary algorithms
@@ -529,23 +530,10 @@ export class DarwinGodelEngine {
 
   /**
    * Calculate cosine similarity between two vectors
+   * Uses optimized implementation when FUSION_ON=1
    */
   private cosineSimilarity(a: number[], b: number[]): number {
-    let dot = 0;
-    let magA = 0;
-    let magB = 0;
-    
-    const len = Math.min(a.length, b.length);
-    for (let i = 0; i < len; i++) {
-      dot += a[i] * b[i];
-      magA += a[i] * a[i];
-      magB += b[i] * b[i];
-    }
-    
-    magA = Math.sqrt(magA);
-    magB = Math.sqrt(magB);
-    
-    return (magA && magB) ? dot / (magA * magB) : 0;
+    return cosineSimilarityAuto(a, b);
   }
 
   /**
