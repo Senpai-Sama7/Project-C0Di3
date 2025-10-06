@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">5.4% </span>
+                <span class="strong">12.61% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>6/111</span>
+                <span class='fraction'>14/111</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">4.22% </span>
+                <span class="strong">7.04% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/71</span>
+                <span class='fraction'>5/71</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">3.33% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/30</span>
+                <span class='fraction'>1/30</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">5.66% </span>
+                <span class="strong">13.2% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>6/106</span>
+                <span class='fraction'>14/106</span>
             </div>
         
             
@@ -482,15 +482,15 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -876,18 +876,18 @@ const logger_1 = require("../utils/logger");
  * in fundamental axioms and builds up from there with zero assumptions
  */
 class AbsoluteZeroReasoner {
-<span class="fstat-no" title="function not covered" >    co</span>nstructor(options) {
+    constructor(options) {
         var _a;
         // Reasoning parameters
-<span class="cstat-no" title="statement not covered" >        this.axiomDepth = 3;</span>
-<span class="cstat-no" title="statement not covered" >        this.inferenceLevels = 4;</span>
-<span class="cstat-no" title="statement not covered" >        this.validationSteps = true;</span>
-<span class="cstat-no" title="statement not covered" >        this.client = options.client;</span>
-<span class="cstat-no" title="statement not covered" >        this.memory = options.memory;</span>
-<span class="cstat-no" title="statement not covered" >        this.eventBus = options.eventBus || new event_bus_1.EventBus();</span>
-<span class="cstat-no" title="statement not covered" >        this.logger = new logger_1.Logger('AbsoluteZeroReasoner');</span>
+        this.axiomDepth = 3;
+        this.inferenceLevels = 4;
+        this.validationSteps = true;
+        this.client = options.client;
+        this.memory = options.memory;
+        this.eventBus = options.eventBus || <span class="branch-1 cbranch-no" title="branch not covered" >new event_bus_1.EventBus();</span>
+        this.logger = new logger_1.Logger('AbsoluteZeroReasoner');
         // Apply custom parameters if provided
-<span class="cstat-no" title="statement not covered" >        if (options.reasoningParams) {</span>
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (options.reasoningParams) {
 <span class="cstat-no" title="statement not covered" >            this.axiomDepth = options.reasoningParams.axiomDepth || this.axiomDepth;</span>
 <span class="cstat-no" title="statement not covered" >            this.inferenceLevels = options.reasoningParams.inferenceLevels || this.inferenceLevels;</span>
 <span class="cstat-no" title="statement not covered" >            this.validationSteps = (_a = options.reasoningParams.validationSteps) !== null &amp;&amp; _a !== void 0 ? _a : this.validationSteps;</span>
@@ -1261,7 +1261,7 @@ exports.AbsoluteZeroReasoner = AbsoluteZeroReasoner;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-06T20:49:00.672Z
+                at 2025-10-06T20:59:03.861Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

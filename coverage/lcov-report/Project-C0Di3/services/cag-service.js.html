@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.71% </span>
+                <span class="strong">7.9% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>5/291</span>
+                <span class='fraction'>23/291</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">3.63% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/55</span>
+                <span class='fraction'>2/55</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">1.77% </span>
+                <span class="strong">8.18% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>5/281</span>
+                <span class='fraction'>23/281</span>
             </div>
         
             
@@ -731,9 +731,9 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -745,22 +745,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1099,7 +1099,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1383,10 +1383,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CAGService = void 0;
 const logger_1 = require("../utils/logger");
 class CAGService {
-<span class="fstat-no" title="function not covered" >    co</span>nstructor(client, knowledgeService, eventBus) {
-<span class="cstat-no" title="statement not covered" >        this.cache = new Map();</span>
-<span class="cstat-no" title="statement not covered" >        this.embeddingCache = new Map();</span>
-<span class="cstat-no" title="statement not covered" >        this.performanceMetrics = {</span>
+    constructor(client, knowledgeService, eventBus) {
+        this.cache = new Map();
+        this.embeddingCache = new Map();
+        this.performanceMetrics = {
             totalQueries: 0,
             cacheHits: 0,
             cacheMisses: 0,
@@ -1398,22 +1398,22 @@ class CAGService {
             prewarmQueries: 0
         };
         // Production-optimized configuration
-<span class="cstat-no" title="statement not covered" >        this.maxCacheSize = 2000; </span>// Increased for better hit rates
-<span class="cstat-no" title="statement not covered" >        this.maxMemoryUsage = 500 * 1024 * 1024; </span>// 500MB max memory
-<span class="cstat-no" title="statement not covered" >        this.defaultCacheTTL = 7200 * 1000; </span>// 2 hours default TTL
-<span class="cstat-no" title="statement not covered" >        this.similarityThreshold = 0.92; </span>// Slightly lower for more hits
-<span class="cstat-no" title="statement not covered" >        this.embeddingCacheSize = 10000; </span>// Increased embedding cache
-<span class="cstat-no" title="statement not covered" >        this.prewarmBatchSize = 50; </span>// Batch size for pre-warming
-<span class="cstat-no" title="statement not covered" >        this.maxResponseTime = 10000; </span>// 10 second timeout
+        this.maxCacheSize = 2000; // Increased for better hit rates
+        this.maxMemoryUsage = 500 * 1024 * 1024; // 500MB max memory
+        this.defaultCacheTTL = 7200 * 1000; // 2 hours default TTL
+        this.similarityThreshold = 0.92; // Slightly lower for more hits
+        this.embeddingCacheSize = 10000; // Increased embedding cache
+        this.prewarmBatchSize = 50; // Batch size for pre-warming
+        this.maxResponseTime = 10000; // 10 second timeout
         // Performance tracking
-<span class="cstat-no" title="statement not covered" >        this.responseTimes = [];</span>
-<span class="cstat-no" title="statement not covered" >        this.maxResponseTimeHistory = 1000;</span>
-<span class="cstat-no" title="statement not covered" >        this.client = client;</span>
-<span class="cstat-no" title="statement not covered" >        this.knowledgeService = knowledgeService;</span>
-<span class="cstat-no" title="statement not covered" >        this.eventBus = eventBus;</span>
-<span class="cstat-no" title="statement not covered" >        this.logger = new logger_1.Logger('CAGService');</span>
+        this.responseTimes = [];
+        this.maxResponseTimeHistory = 1000;
+        this.client = client;
+        this.knowledgeService = knowledgeService;
+        this.eventBus = eventBus;
+        this.logger = new logger_1.Logger('CAGService');
         // Start periodic cache maintenance
-<span class="cstat-no" title="statement not covered" >        this.startCacheMaintenance();</span>
+        this.startCacheMaintenance();
     }
     /**
      * Main CAG query method with production optimizations
@@ -1751,8 +1751,8 @@ class CAGService {
     /**
      * Start periodic cache maintenance
      */
-<span class="fstat-no" title="function not covered" >    st</span>artCacheMaintenance() {
-<span class="cstat-no" title="statement not covered" >        setInterval(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+    startCacheMaintenance() {
+        setInterval(<span class="fstat-no" title="function not covered" >()</span> =&gt; {
 <span class="cstat-no" title="statement not covered" >            this.performCacheMaintenance();</span>
         }, 300000); // Every 5 minutes
     }
@@ -2029,7 +2029,7 @@ exports.CAGService = CAGService;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-06T20:49:00.672Z
+                at 2025-10-06T20:59:03.861Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

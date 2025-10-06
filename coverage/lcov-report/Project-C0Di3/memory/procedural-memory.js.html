@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">8.69% </span>
+                <span class="strong">21.73% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/46</span>
+                <span class='fraction'>10/46</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">15.78% </span>
+                <span class="strong">42.1% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/19</span>
+                <span class='fraction'>8/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">20.68% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/29</span>
+                <span class='fraction'>6/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">25% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/40</span>
+                <span class='fraction'>10/40</span>
             </div>
         
             
@@ -164,18 +164,18 @@
 <a name='L99'></a><a href='#L99'>99</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -192,8 +192,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -260,20 +260,20 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">"use strict";
-var __awaiter = (this &amp;&amp; this.__awaiter) || <span class="fstat-no" title="function not covered" >fu</span>nction (thisArg, _arguments, P, generator) {
+var __awaiter = (this &amp;&amp; this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function <span class="fstat-no" title="function not covered" >adopt(</span>value) { <span class="cstat-no" title="statement not covered" >return value instanceof P ? value : new P(<span class="fstat-no" title="function not covered" >fu</span>nction (resolve) { <span class="cstat-no" title="statement not covered" >resolve(value); </span>}); </span>}
-<span class="cstat-no" title="statement not covered" >    return new (P || (P = Promise))(<span class="fstat-no" title="function not covered" >fu</span>nction (resolve, reject) {</span>
+    return new (P || (P = Promise))(function (resolve, reject) {
         function <span class="fstat-no" title="function not covered" >fulfilled(</span>value) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >step(generator.next(value)); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >reject(e); </span>} </span>}
         function <span class="fstat-no" title="function not covered" >rejected(</span>value) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >step(generator["throw"](value)); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >reject(e); </span>} </span>}
-        function <span class="fstat-no" title="function not covered" >step(</span>result) { <span class="cstat-no" title="statement not covered" >result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); </span>}
-<span class="cstat-no" title="statement not covered" >        step((generator = generator.apply(thisArg, _arguments || [])).next());</span>
+        function step(result) { result.done ? resolve(result.value) : <span class="branch-1 cbranch-no" title="branch not covered" >adopt(result.value).then(fulfilled, rejected);</span> }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProceduralMemory = void 0;
 class ProceduralMemory {
-<span class="fstat-no" title="function not covered" >    co</span>nstructor() {
-<span class="cstat-no" title="statement not covered" >        this.procedures = new Map();</span>
+    constructor() {
+        this.procedures = new Map();
     }
 <span class="fstat-no" title="function not covered" >    ad</span>d(item) {
 <span class="cstat-no" title="statement not covered" >        return __awaiter(this, void 0, void 0, <span class="fstat-no" title="function not covered" >fu</span>nction* () {</span>
@@ -289,9 +289,9 @@ class ProceduralMemory {
 <span class="cstat-no" title="statement not covered" >            return procedure ? { key, content: procedure } : null;</span>
         });
     }
-<span class="fstat-no" title="function not covered" >    ge</span>tAll() {
-<span class="cstat-no" title="statement not covered" >        return __awaiter(this, void 0, void 0, <span class="fstat-no" title="function not covered" >fu</span>nction* () {</span>
-<span class="cstat-no" title="statement not covered" >            return Array.from(this.procedures.entries()).map(<span class="fstat-no" title="function not covered" >([</span>key, content]) =&gt; (<span class="cstat-no" title="statement not covered" >{ key, content })</span>);</span>
+    getAll() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return Array.from(this.procedures.entries()).map(<span class="fstat-no" title="function not covered" >([</span>key, content]) =&gt; (<span class="cstat-no" title="statement not covered" >{ key, content })</span>);
         });
     }
 <span class="fstat-no" title="function not covered" >    fi</span>nd(query) {
@@ -364,7 +364,7 @@ exports.ProceduralMemory = ProceduralMemory;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-10-06T20:49:00.672Z
+                at 2025-10-06T20:59:03.861Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
