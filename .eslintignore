@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+*.js
+!scripts/**/*.js
+!jest.config.js
+!test-*.js
+!bin/*.js
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.test
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+test-results/
+
+# Documentation
+docs/
+
+# Data
+data/
+models/
+artifacts/
+
+# Other
+*.zip
+*.tar.gz
