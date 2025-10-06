@@ -13,6 +13,7 @@ exports.DarwinGodelEngine = void 0;
 const event_bus_1 = require("../events/event-bus");
 const embedding_service_1 = require("../services/embedding-service");
 const logger_1 = require("../utils/logger");
+const vector_ops_1 = require("./vector-ops");
 /**
  * Darwin Gödel Machine - An advanced reasoning system combining evolutionary algorithms
  * with formal logic and self-verification capabilities
@@ -437,20 +438,10 @@ class DarwinGodelEngine {
     }
     /**
      * Calculate cosine similarity between two vectors
+     * Uses optimized implementation when FUSION_ON=1
      */
     cosineSimilarity(a, b) {
-        let dot = 0;
-        let magA = 0;
-        let magB = 0;
-        const len = Math.min(a.length, b.length);
-        for (let i = 0; i < len; i++) {
-            dot += a[i] * b[i];
-            magA += a[i] * a[i];
-            magB += b[i] * b[i];
-        }
-        magA = Math.sqrt(magA);
-        magB = Math.sqrt(magB);
-        return (magA && magB) ? dot / (magA * magB) : 0;
+        return (0, vector_ops_1.cosineSimilarityAuto)(a, b);
     }
     /**
      * Extract the final solution from the verified hypothesis with proper formatting
