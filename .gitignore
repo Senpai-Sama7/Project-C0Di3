@@ -16,3 +16,7 @@ package-lock.json
 # Advanced mode configuration
 .sensei
 artifacts/
+
+# Test coverage reports
+coverage/
+*.lcov

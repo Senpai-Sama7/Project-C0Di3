@@ -13,9 +13,17 @@
     "dev": "ts-node bin/cli.js",
     "build": "tsc",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
+    "typecheck": "tsc --noEmit",
     "deploy": "bash scripts/deploy-production.sh",
     "test-production": "bash scripts/test-production.sh",
-    "build-llama": "bash scripts/build-llama-production.sh"
+    "build-llama": "bash scripts/build-llama-production.sh",
+    "prepare": "npm run build"
   },
   "keywords": [
     "cybersecurity",
@@ -61,7 +69,12 @@
   "devDependencies": {
     "@types/jest": "^29.5.5",
     "@types/jsonwebtoken": "^9.0.10",
-    "jest": "^29.7.0"
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "eslint-plugin-security": "^1.7.1",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
