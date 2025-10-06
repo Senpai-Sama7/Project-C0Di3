@@ -249,15 +249,27 @@ export const ServiceTokens = {
   // Security services
   AuthService: Symbol('AuthService'),
   AuditService: Symbol('AuditService'),
-  
+
   // Reasoning engines
   ReasoningEngine: Symbol('ReasoningEngine'),
   DarwinGodelEngine: Symbol('DarwinGodelEngine'),
   AbsoluteZeroReasoner: Symbol('AbsoluteZeroReasoner'),
-  
+
   // Tools
   ToolRegistry: Symbol('ToolRegistry'),
-  
+
+  // Agent subsystems
+  PluginManager: Symbol('PluginManager'),
+  FeedbackLoop: Symbol('FeedbackLoop'),
+  ContextManager: Symbol('ContextManager'),
+  BookIngestionService: Symbol('BookIngestionService'),
+  LearnModeService: Symbol('LearnModeService'),
+  LogAnalyzerClient: Symbol('LogAnalyzerClient'),
+  LogAnalysisService: Symbol('LogAnalysisService'),
+  CybersecurityKnowledgeService: Symbol('CybersecurityKnowledgeService'),
+  CAGService: Symbol('CAGService'),
+  HealthMonitoringService: Symbol('HealthMonitoringService'),
+
   // Infrastructure
   HealthCheck: Symbol('HealthCheck'),
   MetricsCollector: Symbol('MetricsCollector')
