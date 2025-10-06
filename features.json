@@ -2,41 +2,41 @@
   {
     "id": "F1",
     "feature": "Admin authentication uses configured password",
-    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
     "expected": "auth-admin-login.outcome.success === true",
-    "evidence": "evidence/auth-check-20250214.json",
+    "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
   },
   {
     "id": "F2",
     "feature": "Invalid password attempts are rejected",
-    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
     "expected": "auth-reject-bad-password.outcome.success === false",
-    "evidence": "evidence/auth-check-20250214.json",
+    "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
   },
   {
     "id": "F3",
     "feature": "JWTs are signed and tamper-evident",
-    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
     "expected": "auth-signed-jwt.outcome.tamperedResult.error === 'Invalid token signature'",
-    "evidence": "evidence/auth-check-20250214.json",
+    "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
   },
   {
     "id": "F4",
     "feature": "Credential store persists salted password hash",
-    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
     "expected": "auth-stored-hash.outcome.passwordHash && auth-stored-hash.outcome.passwordSalt",
-    "evidence": "evidence/auth-check-20250214.json",
+    "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
   },
   {
     "id": "F5",
     "feature": "Legacy user records without hashes migrate automatically",
-    "command": "TS_NODE_PREFER_TS_EXTS=1 ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 npx ts-node --transpile-only fixes/auth-service-reality-check.ts",
+    "command": "rm -rf .tmp-verify && mkdir .tmp-verify && npx tsc fixes/auth-service-reality-check.ts --outDir .tmp-verify --module commonjs --target ES2019 --esModuleInterop --skipLibCheck true && ADMIN_PASSWORD=TestAdmin123! JWT_SECRET=RealitySecret123 node .tmp-verify/fixes/auth-service-reality-check.js",
     "expected": "auth-legacy-migration.outcome.migratedLogin === true && !auth-legacy-migration.outcome.retainedPlaintext",
-    "evidence": "evidence/auth-check-20250214.json",
+    "evidence": "evidence/auth-check-20251006-194119.json",
     "status": "VERIFIED"
   },
   {
@@ -44,7 +44,7 @@
     "feature": "TypeScript project builds without syntax errors",
     "command": "npm run build",
     "expected": "tsc exits 0",
-    "evidence": "evidence/npm-build-20250214.log",
+    "evidence": "evidence/npm-build-20251006-194125.log",
     "status": "VERIFIED"
   },
   {
@@ -52,15 +52,15 @@
     "feature": "Pylint runs against Python services only",
     "command": "python3 -m pylint services/prompt_enhancer.py services/log-analyzer",
     "expected": "pylint exits 0 with score 10.00/10",
-    "evidence": "evidence/pylint-20250214.log",
+    "evidence": "evidence/pylint-20251006-194141.log",
     "status": "VERIFIED"
   },
   {
     "id": "F8",
     "feature": "Documentation markdown files include YAML front matter",
-    "command": "python - <<'PY' | tee evidence/docs-front-matter-20250214.txt\nfrom pathlib import Path\nroot = Path('docs')\npaths = sorted(root.glob('*.md'))\nfor path in paths:\n    text = path.read_text().splitlines()\n    status = False\n    if len(text) >= 4 and text[0] == '---' and text[3] == '---':\n        front_matter = '\\n'.join(text[1:3])\n        if 'layout:' in front_matter and 'title:' in front_matter:\n            status = True\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\nPY",
+    "command": "python - <<'PY' | tee evidence/docs-front-matter-<timestamp>.txt\\nfrom pathlib import Path\\nroot = Path('docs')\\npaths = sorted(root.glob('*.md'))\\nfor path in paths:\\n    text = path.read_text().splitlines()\\n    status = False\\n    if len(text) >= 4 and text[0] == '---' and text[3] == '---':\\n        front_matter = '\\n'.join(text[1:3])\\n        if 'layout:' in front_matter and 'title:' in front_matter:\\n            status = True\\n    print(f\"{path}: {'OK' if status else 'MISSING'}\")\\nPY",
     "expected": "all docs/*.md lines report OK",
-    "evidence": "evidence/docs-front-matter-20250214.txt",
+    "evidence": "evidence/docs-front-matter-20251006-194148.txt",
     "status": "VERIFIED"
   }
 ]
