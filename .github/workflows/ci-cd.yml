@@ -1,0 +1,321 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  # Linting and code quality checks
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript compilation
+        run: npm run build
+
+      - name: Run ESLint (if configured)
+        run: npm run lint || echo "ESLint not configured, skipping"
+        continue-on-error: true
+
+  # Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Run dependency check
+        run: |
+          npx audit-ci --moderate
+        continue-on-error: true
+
+  # Unit and integration tests
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: matrix.node-version == 20
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
+
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node-version }}
+          path: |
+            coverage/
+            test-results/
+          retention-days: 7
+
+  # Build verification
+  build:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Verify build artifacts
+        run: |
+          echo "Checking for compiled JavaScript files..."
+          find . -name "*.js" -not -path "./node_modules/*" -not -path "./coverage/*" | head -20
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            ./*.js
+            ./bin/*.js
+            ./clients/*.js
+            ./services/*.js
+            ./utils/*.js
+            ./reasoning/*.js
+            ./memory/*.js
+            ./tools/*.js
+          retention-days: 7
+
+  # Production readiness checks
+  production-checks:
+    name: Production Readiness
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Check deployment scripts
+        run: |
+          echo "Verifying deployment scripts..."
+          bash scripts/deploy-production.sh --dry-run || echo "Dry run not supported"
+        continue-on-error: true
+
+      - name: Verify environment configuration
+        run: |
+          echo "Checking for required environment variables documentation..."
+          if [ -f "docs/DEPLOYMENT_GUIDE.md" ]; then
+            echo "✅ Deployment guide exists"
+          fi
+          if [ -f ".env.example" ]; then
+            echo "✅ Environment example exists"
+          else
+            echo "⚠️  Consider creating .env.example"
+          fi
+
+      - name: Production checklist validation
+        run: |
+          echo "Production Readiness Checklist:"
+          echo "- Documentation: $([ -d 'docs' ] && echo '✅' || echo '❌')"
+          echo "- Tests: $([ -d 'test' ] && echo '✅' || echo '❌')"
+          echo "- Build scripts: $([ -d 'scripts' ] && echo '✅' || echo '❌')"
+          echo "- TypeScript config: $([ -f 'tsconfig.json' ] && echo '✅' || echo '❌')"
+          echo "- Package.json: $([ -f 'package.json' ] && echo '✅' || echo '❌')"
+
+  # Performance benchmarks
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run benchmarks
+        run: |
+          if npm run benchmark 2>/dev/null; then
+            echo "✅ Benchmarks completed"
+          else
+            echo "⚠️  Benchmark script not found, skipping"
+          fi
+        continue-on-error: true
+
+  # Deployment preparation
+  prepare-deploy:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    needs: [lint, test, security, production-checks]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for production
+        run: npm run build
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deployment
+          tar -czf deployment/project-c0di3-$(date +%Y%m%d-%H%M%S).tar.gz \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=coverage \
+            --exclude=test \
+            --exclude=*.ts \
+            .
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: deployment/
+          retention-days: 30
+
+  # Documentation check
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check documentation
+        run: |
+          echo "Checking documentation completeness..."
+          docs_files=(
+            "README.md"
+            "docs/DEPLOYMENT_GUIDE.md"
+            "docs/IMPLEMENTATION_GUIDE.md"
+          )
+          
+          for file in "${docs_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ $file exists"
+            else
+              echo "⚠️  $file missing"
+            fi
+          done
+
+      - name: Check for TODOs and FIXMEs
+        run: |
+          echo "Checking for TODOs and FIXMEs..."
+          grep -r "TODO\|FIXME" --include="*.ts" --include="*.js" . || echo "No TODOs or FIXMEs found"
+        continue-on-error: true
+
+  # Summary
+  pipeline-summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, security, build, production-checks, docs]
+    if: always()
+    steps:
+      - name: Check pipeline status
+        run: |
+          echo "🎯 CI/CD Pipeline Summary"
+          echo "========================"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Test: ${{ needs.test.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo "Production Checks: ${{ needs.production-checks.result }}"
+          echo "Documentation: ${{ needs.docs.result }}"

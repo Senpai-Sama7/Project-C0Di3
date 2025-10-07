@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: core-agent-config
+  namespace: core-agent
+data:
+  NODE_ENV: "production"
+  LLM_API_URL: "http://llama-cpp-service:8000"
+  LOG_ANALYZER_URL: "http://log-analyzer-service:5001"
+  MEMORY_VECTOR_STORE: "local"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: core-agent-secrets
+  namespace: core-agent
+type: Opaque
+stringData:
+  # Generate secure values for production
+  MEMORY_ENCRYPTION_KEY: "CHANGE_ME_32_CHARACTERS_MINIMUM"
+  JWT_SECRET: "CHANGE_ME_32_CHARACTERS_MINIMUM"
+  ADMIN_PASSWORD: "CHANGE_ME_SECURE_PASSWORD"
+  POSTGRES_PASSWORD: "CHANGE_ME_POSTGRES_PASSWORD"
+  REDIS_PASSWORD: "CHANGE_ME_REDIS_PASSWORD"

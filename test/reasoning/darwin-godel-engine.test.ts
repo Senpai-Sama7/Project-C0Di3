@@ -78,7 +78,7 @@ describe('DarwinGodelEngine', () => {
     it('should generate a complete reasoning plan', async () => {
       const input = 'Test security analysis';
       const context = { userId: '123' };
-      const relevantMemories = [];
+      const relevantMemories: any[] = [];
 
       const plan = await engine.generatePlan(input, context, relevantMemories);
 

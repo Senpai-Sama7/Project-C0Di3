@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-agent
+  namespace: core-agent
+  labels:
+    app: core-agent
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: core-agent
+  template:
+    metadata:
+      labels:
+        app: core-agent
+        version: v1
+    spec:
+      containers:
+      - name: core-agent
+        image: core-agent:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: core-agent-config
+        - secretRef:
+            name: core-agent-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: core-agent-data-pvc
+      - name: logs
+        persistentVolumeClaim:
+          claimName: core-agent-logs-pvc
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-agent-service
+  namespace: core-agent
+  labels:
+    app: core-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: core-agent
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: core-agent-data-pvc
+  namespace: core-agent
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: core-agent-logs-pvc
+  namespace: core-agent
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
