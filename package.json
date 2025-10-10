@@ -20,6 +20,7 @@
     "format": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
     "typecheck": "tsc --noEmit",
+    "validate": "npm run lint && npm run build && npm test",
     "deploy": "bash scripts/deploy-production.sh",
     "test-production": "bash scripts/test-production.sh",
     "build-llama": "bash scripts/build-llama-production.sh",

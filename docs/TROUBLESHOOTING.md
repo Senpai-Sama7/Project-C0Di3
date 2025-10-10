@@ -1,459 +1,499 @@
 # Troubleshooting Guide - Project C0Di3
 
+Common issues and their solutions for Project C0Di3.
+
 ## Table of Contents
-1. [Common Issues](#common-issues)
-2. [Build Problems](#build-problems)
-3. [Test Failures](#test-failures)
-4. [Runtime Errors](#runtime-errors)
-5. [Performance Issues](#performance-issues)
-6. [Deployment Problems](#deployment-problems)
-7. [Security Concerns](#security-concerns)
-8. [Debugging Tips](#debugging-tips)
+
+- [Installation Issues](#installation-issues)
+- [Build Problems](#build-problems)
+- [Test Failures](#test-failures)
+- [Runtime Errors](#runtime-errors)
+- [Deployment Issues](#deployment-issues)
+- [Performance Problems](#performance-problems)
+- [CI/CD Issues](#cicd-issues)
+- [Getting Help](#getting-help)
 
 ---
 
-## Common Issues
+## Installation Issues
 
-### Node Modules Not Found
+### Issue: `npm install` fails with EACCES error
 
-**Symptom**: `Cannot find module` errors
-
-**Solution**:
-```bash
-# Remove and reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-
-# Rebuild TypeScript
-npm run build
+**Symptoms:**
+```
+npm ERR! Error: EACCES: permission denied
 ```
 
-### TypeScript Compilation Errors
+**Solutions:**
+1. **Don't use sudo** with npm (security risk)
+2. **Fix npm permissions:**
+   ```bash
+   mkdir ~/.npm-global
+   npm config set prefix '~/.npm-global'
+   echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+3. **Use nvm (Node Version Manager):**
+   ```bash
+   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+   nvm install 20
+   nvm use 20
+   ```
 
-**Symptom**: `tsc` fails with type errors
+---
 
-**Solution**:
-```bash
-# Check TypeScript configuration
-npm run typecheck
+### Issue: Module not found errors after installation
 
-# Fix common issues
-npm run lint:fix
-
-# Clean build
-rm -rf *.js **/*.js
-npm run build
+**Symptoms:**
+```
+Error: Cannot find module 'axios'
 ```
 
-### Environment Variables Not Set
+**Solutions:**
+1. **Clean install:**
+   ```bash
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+2. **Verify node_modules exists:**
+   ```bash
+   ls node_modules/
+   ```
+3. **Check package.json for missing dependencies**
 
-**Symptom**: Application fails to start with missing configuration
+---
 
-**Solution**:
-```bash
-# Copy environment template
-cp .env.example .env
+### Issue: TypeScript compilation fails during installation
 
-# Generate secure keys
-echo "MEMORY_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> .env
-echo "JWT_SECRET=$(openssl rand -base64 32)" >> .env
-
-# Edit .env with your values
-nano .env
+**Symptoms:**
 ```
+error TS2307: Cannot find module 'axios' or its corresponding type declarations.
+```
+
+**Solutions:**
+1. **Install all dependencies including types:**
+   ```bash
+   npm install
+   ```
+2. **Verify TypeScript version:**
+   ```bash
+   npx tsc --version  # Should be 5.2.2+
+   ```
+3. **Check tsconfig.json is present**
 
 ---
 
 ## Build Problems
 
-### Build Fails with Memory Error
+### Issue: Build fails with type errors
 
-**Symptom**: `JavaScript heap out of memory`
-
-**Solution**:
-```bash
-# Increase Node.js memory limit
-export NODE_OPTIONS="--max-old-space-size=4096"
-npm run build
+**Symptoms:**
+```
+error TS2322: Type 'string' is not assignable to type 'number'
 ```
 
-### Missing Dependencies
+**Solutions:**
+1. **Check TypeScript strict mode settings in tsconfig.json**
+2. **Fix type mismatches in your code**
+3. **Use type assertions carefully:**
+   ```typescript
+   const value = input as number;  // Use sparingly
+   ```
 
-**Symptom**: Build fails with module not found
+---
 
-**Solution**:
-```bash
-# Verify all dependencies are installed
-npm ci
+### Issue: Build is slow
 
-# Check for peer dependency issues
-npm ls
+**Solutions:**
+1. **Use incremental compilation:**
+   ```json
+   // tsconfig.json
+   {
+     "compilerOptions": {
+       "incremental": true
+     }
+   }
+   ```
+2. **Exclude unnecessary files:**
+   ```json
+   {
+     "exclude": ["node_modules", "coverage", "dist"]
+   }
+   ```
+3. **Use faster build tool:**
+   ```bash
+   npm install -D esbuild
+   ```
 
-# Update outdated packages (with caution)
-npm outdated
-npm update
-```
+---
+
+### Issue: JavaScript files not being generated
+
+**Symptoms:**
+- TypeScript builds without errors
+- No .js files in output directory
+
+**Solutions:**
+1. **Check tsconfig.json outDir:**
+   ```json
+   {
+     "compilerOptions": {
+       "outDir": "./dist"
+     }
+   }
+   ```
+2. **Ensure files are included:**
+   ```json
+   {
+     "include": ["**/*.ts"]
+   }
+   ```
+3. **Check for .gitignore blocking .js files**
 
 ---
 
 ## Test Failures
 
-### Jest Configuration Issues
+### Issue: Tests fail with "MEMORY_ENCRYPTION_KEY must be set"
 
-**Symptom**: Tests fail to run or incorrect test environment
-
-**Solution**:
-```bash
-# Clear Jest cache
-npx jest --clearCache
-
-# Run with verbose output
-npm test -- --verbose
-
-# Run specific test file
-npm test -- test/path/to/test.test.ts
+**Symptoms:**
+```
+Error: MEMORY_ENCRYPTION_KEY must be set and at least 32 characters
 ```
 
-### Test Timeout Errors
+**Solutions:**
+1. **Set environment variable:**
+   ```bash
+   export MEMORY_ENCRYPTION_KEY="test-key-minimum-32-characters-long-secure"
+   npm test
+   ```
+2. **Create .env.test file:**
+   ```bash
+   echo 'MEMORY_ENCRYPTION_KEY="test-key-minimum-32-characters-long-secure"' > .env.test
+   ```
+3. **Add to test script:**
+   ```json
+   {
+     "scripts": {
+       "test": "MEMORY_ENCRYPTION_KEY=\"test-key-32-chars-minimum\" jest"
+     }
+   }
+   ```
 
-**Symptom**: Tests fail with timeout exceeded
+---
 
-**Solution**:
-```bash
-# Increase test timeout in jest.config.js
-# Or use --testTimeout flag
-npm test -- --testTimeout=10000
+### Issue: Jest can't find modules
+
+**Symptoms:**
+```
+Cannot find module '../../utils/logger' from 'test/utils/logger.test.ts'
 ```
 
-### Mock/Stub Issues
+**Solutions:**
+1. **Clear Jest cache:**
+   ```bash
+   npx jest --clearCache
+   ```
+2. **Check jest.config.js:**
+   ```javascript
+   module.exports = {
+     preset: 'ts-jest',
+     testEnvironment: 'node',
+     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx']
+   };
+   ```
+3. **Verify file paths are correct**
 
-**Symptom**: Tests fail due to module mocking problems
+---
 
-**Solution**:
-```typescript
-// Ensure proper mock setup
-jest.mock('../../utils/module', () => ({
-  function: jest.fn()
-}));
+### Issue: Tests timeout
 
-// Clear mocks between tests
-beforeEach(() => {
-  jest.clearAllMocks();
-});
+**Symptoms:**
 ```
+Timeout - Async callback was not invoked within the 5000 ms timeout
+```
+
+**Solutions:**
+1. **Increase timeout for specific test:**
+   ```typescript
+   it('slow test', async () => {
+     await slowOperation();
+   }, 30000); // 30 seconds
+   ```
+2. **Increase global timeout in jest.config.js:**
+   ```javascript
+   module.exports = {
+     testTimeout: 10000
+   };
+   ```
+3. **Check for unresolved promises**
+
+---
+
+### Issue: Memory leaks in tests
+
+**Symptoms:**
+```
+A worker process has failed to exit gracefully
+```
+
+**Solutions:**
+1. **Clean up in afterEach:**
+   ```typescript
+   afterEach(() => {
+     jest.clearAllMocks();
+     jest.clearAllTimers();
+   });
+   ```
+2. **Use --detectOpenHandles:**
+   ```bash
+   npm test -- --detectOpenHandles
+   ```
+3. **Close connections:**
+   ```typescript
+   afterAll(async () => {
+     await database.close();
+     await server.close();
+   });
+   ```
 
 ---
 
 ## Runtime Errors
 
-### Application Crashes on Startup
+### Issue: "Port already in use" error
 
-**Symptom**: Process exits immediately or with error
-
-**Diagnosis**:
-```bash
-# Check logs
-tail -f logs/core-agent.log
-
-# Run with debug mode
-NODE_ENV=development npm start
-
-# Check for port conflicts
-lsof -i :3000
+**Symptoms:**
+```
+Error: listen EADDRINUSE: address already in use :::3000
 ```
 
-**Common Causes**:
-1. Missing environment variables
-2. Port already in use
-3. Database connection failure
-4. Insufficient permissions
-
-### Memory Leaks
-
-**Symptom**: Memory usage continuously increases
-
-**Diagnosis**:
-```bash
-# Monitor memory usage
-node --inspect bin/cli.js
-
-# Use Chrome DevTools for heap snapshots
-# Navigate to chrome://inspect
-```
-
-**Solutions**:
-- Clear caches periodically
-- Implement proper cleanup in event handlers
-- Use weak references where appropriate
-- Review long-lived objects
-
-### Unhandled Promise Rejections
-
-**Symptom**: `UnhandledPromiseRejectionWarning`
-
-**Solution**:
-```typescript
-// Always handle promise rejections
-async function operation() {
-  try {
-    await riskyOperation();
-  } catch (error) {
-    logger.error('Operation failed', error);
-    // Handle or rethrow
-  }
-}
-
-// Global handler (last resort)
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection', { reason, promise });
-});
-```
+**Solutions:**
+1. **Find and kill the process:**
+   ```bash
+   lsof -ti:3000 | xargs kill -9
+   ```
+2. **Change port in .env:**
+   ```bash
+   PORT=3001
+   ```
+3. **Use dynamic port:**
+   ```typescript
+   const port = process.env.PORT || 0; // 0 = random available port
+   ```
 
 ---
 
-## Performance Issues
+### Issue: "Cannot find module" at runtime
 
-### Slow Response Times
-
-**Diagnosis**:
-```bash
-# Enable performance monitoring
-export ENABLE_METRICS=true
-npm start
-
-# Check metrics endpoint
-curl http://localhost:9090/metrics
+**Symptoms:**
+```
+Error: Cannot find module './compiled-file.js'
 ```
 
-**Common Causes**:
-1. Unoptimized database queries
-2. Missing cache implementation
-3. Synchronous operations blocking event loop
-4. Large payload processing
-
-**Solutions**:
-```typescript
-// Use memoization for expensive operations
-import { memoize } from './utils/performance';
-const cached = memoize(expensiveFunction, { ttl: 3600000 });
-
-// Implement batching
-import { BatchProcessor } from './utils/performance';
-const processor = new BatchProcessor(batchOperation);
-
-// Use connection pooling
-import { ConnectionPool } from './utils/connection-pool';
-const pool = new ConnectionPool({ min: 2, max: 10 });
-```
-
-### High CPU Usage
-
-**Diagnosis**:
-```bash
-# Profile CPU usage
-node --prof bin/cli.js
-
-# Analyze profile
-node --prof-process isolate-*.log > profile.txt
-```
-
-**Solutions**:
-- Optimize algorithms (reduce O(n²) operations)
-- Use worker threads for CPU-intensive tasks
-- Implement rate limiting
-- Add concurrency controls
-
-### Database Performance
-
-**Symptoms**: Slow queries, connection timeouts
-
-**Solutions**:
-```sql
--- Add indexes for frequently queried columns
-CREATE INDEX idx_user_email ON users(email);
-CREATE INDEX idx_memory_timestamp ON memories(timestamp);
-
--- Analyze query performance
-EXPLAIN ANALYZE SELECT * FROM table WHERE condition;
-
--- Enable query logging
-SET log_statement = 'all';
-```
+**Solutions:**
+1. **Build before running:**
+   ```bash
+   npm run build
+   npm start
+   ```
+2. **Check module paths in compiled JS**
+3. **Verify files are compiled to correct location**
 
 ---
 
-## Deployment Problems
+### Issue: Environment variables not loading
 
-### Docker Build Failures
+**Symptoms:**
+- `process.env.VARIABLE` is undefined
+- Configuration not working
 
-**Symptom**: Docker image build fails
-
-**Solution**:
-```bash
-# Build with verbose output
-docker build --progress=plain -t core-agent:latest .
-
-# Check .dockerignore
-cat .dockerignore
-
-# Clean Docker cache
-docker system prune -af
-docker build --no-cache -t core-agent:latest .
-```
-
-### Kubernetes Pod CrashLoopBackOff
-
-**Symptom**: Pods repeatedly crash
-
-**Diagnosis**:
-```bash
-# Check pod logs
-kubectl logs -n core-agent deployment/core-agent --tail=100
-
-# Describe pod for events
-kubectl describe pod -n core-agent <pod-name>
-
-# Check resource limits
-kubectl top pods -n core-agent
-```
-
-**Common Causes**:
-1. Missing secrets/configmaps
-2. Insufficient resources
-3. Health check failures
-4. Application configuration errors
-
-### Health Check Failures
-
-**Symptom**: Load balancer marks service unhealthy
-
-**Diagnosis**:
-```bash
-# Test health endpoint
-curl -v http://localhost:3000/health
-
-# Check response time
-time curl http://localhost:3000/health
-
-# Review health check configuration
-cat k8s/deployment.yaml | grep -A 10 livenessProbe
-```
+**Solutions:**
+1. **Load dotenv early:**
+   ```typescript
+   import 'dotenv/config';
+   ```
+2. **Check .env file exists:**
+   ```bash
+   ls -la .env
+   ```
+3. **Verify .env format:**
+   ```bash
+   KEY=value
+   # No spaces around =
+   # No quotes needed (usually)
+   ```
 
 ---
 
-## Security Concerns
+## Deployment Issues
 
-### Exposed Secrets
+### Issue: Deployment script fails with permission denied
 
-**Prevention**:
-```bash
-# Never commit secrets
-echo ".env" >> .gitignore
-echo "*.key" >> .gitignore
-echo "*.pem" >> .gitignore
-
-# Scan for leaked secrets
-npm install -g git-secrets
-git secrets --scan
-
-# Use environment variables
-export SENSITIVE_VALUE="..."
+**Symptoms:**
+```
+bash: ./scripts/deploy-production.sh: Permission denied
 ```
 
-### Dependency Vulnerabilities
-
-**Detection**:
-```bash
-# Run npm audit
-npm audit
-
-# Check for high/critical vulnerabilities
-npm audit --audit-level=high
-
-# Fix automatically (with caution)
-npm audit fix
-```
-
-### Rate Limit Bypass
-
-**Symptom**: Excessive requests getting through
-
-**Solution**:
-```typescript
-// Implement rate limiting
-import { TokenBucket } from './utils/rate-limiter';
-
-const rateLimiter = new TokenBucket({
-  capacity: 100,
-  tokensPerInterval: 10,
-  interval: 'second'
-});
-
-// Apply to routes
-await rateLimiter.execute(async () => {
-  // Protected operation
-});
-```
+**Solutions:**
+1. **Make script executable:**
+   ```bash
+   chmod +x scripts/deploy-production.sh
+   ```
+2. **Run with bash explicitly:**
+   ```bash
+   bash scripts/deploy-production.sh
+   ```
 
 ---
 
-## Debugging Tips
+### Issue: Dependencies not installed on production server
 
-### Enable Debug Logging
+**Solutions:**
+1. **Use npm ci instead of npm install:**
+   ```bash
+   npm ci --production
+   ```
+2. **Check package-lock.json exists**
+3. **Verify Node.js version on server:**
+   ```bash
+   node -v  # Should be 18+
+   ```
 
-```bash
-# Set log level
-export LOG_LEVEL=debug
-npm start
+---
 
-# Use debug package
-DEBUG=* npm start
-DEBUG=core:* npm start
-```
+### Issue: Environment variables missing in production
 
-### Remote Debugging
+**Solutions:**
+1. **Verify .env file on server:**
+   ```bash
+   cat .env
+   ```
+2. **Check environment variable in process:**
+   ```bash
+   printenv | grep ENCRYPTION_KEY
+   ```
+3. **Use secrets management:**
+   - AWS Secrets Manager
+   - HashiCorp Vault
+   - GitHub Secrets (for CI/CD)
 
-```bash
-# Start with inspect flag
-node --inspect=0.0.0.0:9229 bin/cli.js
+---
 
-# Connect with Chrome DevTools
-# Navigate to chrome://inspect
-```
+## Performance Problems
 
-### TypeScript Source Maps
+### Issue: High memory usage
 
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "sourceMap": true,
-    "inlineSourceMap": false
-  }
-}
-```
+**Symptoms:**
+- Application crashes with "Out of memory"
+- Slow performance over time
 
-### Performance Profiling
+**Solutions:**
+1. **Increase Node.js memory:**
+   ```bash
+   NODE_OPTIONS="--max-old-space-size=4096" npm start
+   ```
+2. **Check for memory leaks:**
+   ```bash
+   node --inspect bin/cli.js
+   # Open chrome://inspect in Chrome
+   ```
+3. **Use memory profiling:**
+   ```typescript
+   console.log(process.memoryUsage());
+   ```
 
-```bash
-# Generate CPU profile
-node --prof bin/cli.js
+---
 
-# Generate heap snapshot
-node --inspect bin/cli.js
-# In Chrome DevTools: Memory > Take heap snapshot
-```
+### Issue: Slow API responses
 
-### Database Query Debugging
+**Solutions:**
+1. **Add caching:**
+   ```typescript
+   import { MemoryCache } from './memory/memory-cache';
+   const cache = new MemoryCache({ maxSize: 1000, ttl: 3600000 });
+   ```
+2. **Use connection pooling**
+3. **Optimize database queries**
+4. **Add performance monitoring:**
+   ```typescript
+   const start = Date.now();
+   // ... operation
+   console.log(`Duration: ${Date.now() - start}ms`);
+   ```
 
-```typescript
-// Enable query logging
-import { Pool } from 'pg';
-const pool = new Pool({
-  // ... config
-  log: (msg) => console.log('[SQL]', msg)
-});
-```
+---
+
+### Issue: High CPU usage
+
+**Solutions:**
+1. **Profile CPU usage:**
+   ```bash
+   node --prof bin/cli.js
+   node --prof-process isolate-*.log > processed.txt
+   ```
+2. **Optimize algorithms**
+3. **Use worker threads for CPU-intensive tasks**
+4. **Implement rate limiting**
+
+---
+
+## CI/CD Issues
+
+### Issue: GitHub Actions workflow fails
+
+**Symptoms:**
+- Workflow fails in CI but passes locally
+- Different behavior on different runners
+
+**Solutions:**
+1. **Check Node.js version:**
+   ```yaml
+   - uses: actions/setup-node@v4
+     with:
+       node-version: '20'
+   ```
+2. **Use npm ci instead of npm install:**
+   ```yaml
+   - run: npm ci
+   ```
+3. **Check for environment-specific code**
+
+---
+
+### Issue: Tests pass locally but fail in CI
+
+**Solutions:**
+1. **Replicate CI environment:**
+   ```bash
+   npm ci
+   NODE_ENV=test npm test
+   ```
+2. **Check for timing issues**
+3. **Use fixed timestamps in tests:**
+   ```typescript
+   jest.useFakeTimers();
+   ```
+
+---
+
+### Issue: Deployment workflow times out
+
+**Solutions:**
+1. **Increase timeout:**
+   ```yaml
+   jobs:
+     deploy:
+       timeout-minutes: 30
+   ```
+2. **Optimize build process**
+3. **Use caching:**
+   ```yaml
+   - uses: actions/cache@v4
+     with:
+       path: node_modules
+       key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+   ```
 
 ---
 
@@ -461,54 +501,131 @@ const pool = new Pool({
 
 ### Before Asking for Help
 
-1. Check this troubleshooting guide
-2. Review error logs carefully
-3. Search existing issues on GitHub
-4. Verify your environment configuration
-5. Try reproducing in a clean environment
+1. **Search existing issues:**
+   - Check GitHub Issues
+   - Search documentation
+   - Review closed issues
 
-### Information to Provide
+2. **Gather information:**
+   - Node.js version: `node -v`
+   - npm version: `npm -v`
+   - Operating system
+   - Error messages (full stack trace)
+   - Steps to reproduce
 
-When reporting issues, include:
+3. **Create minimal reproduction:**
+   - Isolate the problem
+   - Remove unnecessary code
+   - Create a small test case
 
-- Operating system and version
-- Node.js version (`node --version`)
-- npm version (`npm --version`)
-- Relevant error messages and stack traces
-- Steps to reproduce the issue
-- Configuration (sanitized, no secrets)
-- Recent changes or deployments
+### How to Ask for Help
 
-### Useful Commands
+1. **GitHub Issues:**
+   - Use issue templates
+   - Provide reproduction steps
+   - Include error logs
+   - Tag appropriately
 
-```bash
-# System information
-uname -a
-node --version
-npm --version
+2. **GitHub Discussions:**
+   - For questions and general help
+   - Share solutions that helped you
+   - Be respectful and patient
 
-# Environment check
-env | grep -i core
+3. **Documentation:**
+   - Check README.md
+   - Review docs/ directory
+   - Read CONTRIBUTING.md
 
-# Network diagnostics
-netstat -tulpn | grep :3000
-ss -tulpn | grep :3000
+### Creating a Bug Report
 
-# Process information
-ps aux | grep node
-top -p $(pgrep node)
+Include:
+- **Description:** Clear description of the issue
+- **Expected behavior:** What should happen
+- **Actual behavior:** What actually happens
+- **Steps to reproduce:**
+  1. Step 1
+  2. Step 2
+  3. etc.
+- **Environment:**
+  - OS: Ubuntu 22.04
+  - Node: v20.0.0
+  - npm: v9.0.0
+- **Logs:** Relevant error messages
+- **Code:** Minimal reproduction code
+
+### Template for Bug Reports
+
+```markdown
+## Description
+Brief description of the issue
+
+## Steps to Reproduce
+1. Step 1
+2. Step 2
+3. See error
+
+## Expected Behavior
+What should happen
+
+## Actual Behavior
+What actually happens
+
+## Environment
+- OS: 
+- Node.js: 
+- npm: 
+- Project version: 
+
+## Error Logs
+```
+Paste error logs here
+```
+
+## Additional Context
+Any other relevant information
 ```
 
 ---
 
-## Additional Resources
+## Quick Reference
 
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
-- [Implementation Guide](./IMPLEMENTATION_GUIDE.md)
-- [API Documentation](./API_DOCUMENTATION.md)
-- [Performance Tuning](./PERFORMANCE_TUNING.md)
+### Common Commands
+
+```bash
+# Clean install
+rm -rf node_modules package-lock.json && npm install
+
+# Clear caches
+npm cache clean --force
+npx jest --clearCache
+
+# Run with debug
+DEBUG=* npm start
+
+# Check for security issues
+npm audit
+
+# Update dependencies
+npm update
+
+# Check outdated packages
+npm outdated
+```
+
+### Useful Tools
+
+- **nvm:** Node.js version manager
+- **npx:** Run npm packages without installing
+- **npm-check:** Check for outdated dependencies
+- **node-inspector:** Debug Node.js applications
+- **pm2:** Process manager for Node.js
 
 ---
 
-*Last Updated: 2024*
-*Version: 1.0.0*
+**Last Updated**: 2024  
+**Version**: 1.0.0
+
+For additional help, visit:
+- [GitHub Issues](https://github.com/Senpai-Sama7/Project-C0Di3/issues)
+- [Documentation](./README.md)
+- [Contributing Guide](../CONTRIBUTING.md)
