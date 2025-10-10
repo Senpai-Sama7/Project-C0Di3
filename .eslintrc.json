@@ -44,6 +44,6 @@
     "!jest.config.js",
     "!test-*.js",
     "!bin/*.js",
-    "!scripts/**/*.js"
+    "!scripts/*.js"
   ]
 }
