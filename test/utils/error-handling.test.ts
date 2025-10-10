@@ -158,7 +158,7 @@ describe('Error Handling Utilities', () => {
         .mockResolvedValue('success');
       
       const start = Date.now();
-      await withRetry(fn, { maxRetries: 2, initialDelay: 100, backoffMultiplier: 2 });
+      await withRetry(fn, { maxRetries: 2, initialDelayMs: 100, backoffMultiplier: 2 });
       const elapsed = Date.now() - start;
       
       // Should have waited at least 100ms before retry
@@ -215,37 +215,33 @@ describe('Error Handling Utilities', () => {
       const fn = async () => 'success';
       const result = await safeExecute(fn);
       
-      expect(result.success).toBe(true);
-      expect(result.data).toBe('success');
-      expect(result.error).toBeUndefined();
+      expect(result).toBe('success');
     });
 
-    it('should return error result', async () => {
+    it('should return fallback value on error', async () => {
+      const error = new Error('failure');
+      const fn = async () => { throw error; };
+      const result = await safeExecute(fn, undefined, 'fallback');
+      
+      expect(result).toBe('fallback');
+    });
+
+    it('should return undefined if no fallback provided', async () => {
       const error = new Error('failure');
       const fn = async () => { throw error; };
       const result = await safeExecute(fn);
       
-      expect(result.success).toBe(false);
-      expect(result.error).toBe(error);
-      expect(result.data).toBeUndefined();
+      expect(result).toBeUndefined();
     });
 
-    it('should call onError callback', async () => {
+    it('should call logger on error', async () => {
       const error = new Error('failure');
-      const onError = jest.fn();
+      const logger = { error: jest.fn() };
       const fn = async () => { throw error; };
       
-      await safeExecute(fn, onError);
+      await safeExecute(fn, logger);
       
-      expect(onError).toHaveBeenCalledWith(error);
-    });
-
-    it('should handle synchronous functions', async () => {
-      const fn = () => 'sync success';
-      const result = await safeExecute(fn);
-      
-      expect(result.success).toBe(true);
-      expect(result.data).toBe('sync success');
+      expect(logger.error).toHaveBeenCalledWith('Operation failed', error);
     });
   });
 });

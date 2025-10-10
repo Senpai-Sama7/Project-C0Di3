@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.gitmodules
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Testing
+coverage
+test
+*.test.ts
+*.spec.ts
+
+# Documentation
+docs
+*.md
+!README.md
+
+# TypeScript source files
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Development files
+.vscode
+.cursor
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+*.log
+*.tmp
+*.swp
+artifacts
+
+# CI/CD
+.github
+.gitsensei
+
+# Other
+*.zip
+*.mp4
+verification-matrix.md
+CODE_AUDIT.md
+REALITY_CHECKLIST.txt
