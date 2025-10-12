@@ -8,6 +8,7 @@ export interface VectorizedData {
 export interface DocumentChunk {
   id: string;
   text: string;
+  embedding?: number[];
   metadata?: Record<string, any>;
 }
 
@@ -15,6 +16,7 @@ export interface SearchResult {
   id: string;
   text: string;
   score: number;
+  metadata?: Record<string, any>;
 }
 
 export interface VectorStore {
