@@ -1,7 +1,7 @@
 import { EventBus } from '../events/event-bus';
 import { MemorySystem } from '../memory/memory-system';
 import { EmbeddingService } from '../services/embedding-service';
-import { LLMClient } from '../types';
+import { LLMClient, ReasoningContext, PopulationMember, MemoryItem } from '../types';
 import { Logger } from '../utils/logger';
 import { cosineSimilarityAuto } from './vector-ops';
 
@@ -52,9 +52,9 @@ export class DarwinGodelEngine {
    */
   async generatePlan(
     input: string,
-    context: any,
-    relevantMemories: any
-  ): Promise<any> {
+    context: ReasoningContext,
+    relevantMemories: MemoryItem[]
+  ): Promise<DarwinGodelPlan> {
     this.logger.debug('Generating Darwin-Gödel reasoning plan for:', input);
 
     // Extract relevant axioms from context and memories
@@ -64,46 +64,45 @@ export class DarwinGodelEngine {
     const initialHypotheses = await this.generateInitialHypotheses(input, axioms);
 
     // Structure the reasoning plan with evolutionary steps
-    const plan = {
+    const plan: DarwinGodelPlan = {
       steps: [
         {
           id: 'axiom-extraction',
-          type: 'darwin-godel',
+          type: 'darwin-godel' as const,
           description: 'Extract foundational axioms',
-          input,
-          axioms
+          input
         },
         {
           id: 'hypotheses-generation',
-          type: 'darwin-godel',
+          type: 'darwin-godel' as const,
           description: 'Generate initial hypotheses',
-          input,
-          hypotheses: initialHypotheses
+          input
         },
         {
           id: 'evolutionary-optimization',
-          type: 'darwin-godel',
+          type: 'darwin-godel' as const,
           description: 'Perform evolutionary optimization of hypotheses',
-          input,
-          hypotheses: initialHypotheses,
-          generations: this.maxGenerations
+          input
         },
         {
           id: 'formal-verification',
-          type: 'darwin-godel',
+          type: 'verification' as const,
           description: 'Verify logical consistency of best hypothesis',
           input
         },
         {
           id: 'solution-extraction',
-          type: 'darwin-godel',
+          type: 'extraction' as const,
           description: 'Extract final solution from verified hypothesis',
           input
         }
       ],
       toolsRequired: [],
       estimatedComplexity: 0.8,
-      cached: false
+      metadata: {
+        strategy: 'darwin-godel',
+        timestamp: Date.now()
+      }
     };
 
     this.eventBus.emit('darwin-godel.plan.generated', {
@@ -151,7 +150,7 @@ export class DarwinGodelEngine {
   /**
    * Execute a specific Darwin-Gödel reasoning step
    */
-  async executeStep(step: any, context: any): Promise<any> {
+  async executeStep(step: any, context: ReasoningContext): Promise<unknown> {
     this.logger.debug(`Executing Darwin-Gödel step: ${step.id}`);
 
     switch (step.id) {
@@ -417,7 +416,7 @@ export class DarwinGodelEngine {
   /**
    * Get the best hypothesis (used by later steps)
    */
-  private async getBestHypothesis(problem: string, context: any): Promise<string> {
+  private async getBestHypothesis(problem: string, context: ReasoningContext): Promise<string> {
     const optimizationResults = await this.performEvolutionaryOptimization(
       problem,
       context.hypotheses || [],
@@ -650,7 +649,7 @@ ${hypothesis}
   /**
    * Perform evolutionary step on population with fitness evaluation
    */
-  private async performEvolutionaryStep(population: any[]): Promise<any[]> {
+  private async performEvolutionaryStep(population: PopulationMember[]): Promise<PopulationMember[]> {
     try {
       this.logger.debug('Performing evolutionary step on population');
       
@@ -696,7 +695,7 @@ ${hypothesis}
   /**
    * Verify consistency of reasoning plan structure and dependencies
    */
-  private async verifyConsistency(plan: any): Promise<boolean> {
+  private async verifyConsistency(plan: DarwinGodelPlan): Promise<boolean> {
     try {
       this.logger.debug('Verifying consistency of plan');
       
@@ -760,7 +759,7 @@ ${hypothesis}
   /**
    * Check for circular dependencies in plan steps
    */
-  private hasCircularDependencies(steps: any[]): boolean {
+  private hasCircularDependencies(steps: DarwinGodelStep[]): boolean {
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
     
@@ -795,7 +794,7 @@ ${hypothesis}
   /**
    * Extract axioms from context using semantic analysis
    */
-  private async extractFromContext(context: any): Promise<string[]> {
+  private async extractFromContext(context: ReasoningContext): Promise<string[]> {
     this.logger.debug('Extracting axioms from context');
     const axioms: string[] = [];
     
@@ -868,7 +867,7 @@ ${hypothesis}
   /**
    * Extract axioms from relevant memories
    */
-  private async extractFromMemories(memories: any[]): Promise<string[]> {
+  private async extractFromMemories(memories: MemoryItem[]): Promise<string[]> {
     this.logger.debug('Extracting axioms from memories');
     const axioms: string[] = [];
     
@@ -948,4 +947,26 @@ export interface VerificationResult {
   verified: boolean;
   confidence: number;
   inconsistencies: string[];
+}
+
+interface DarwinGodelPlan {
+  steps: DarwinGodelStep[];
+  toolsRequired: string[];
+  estimatedComplexity: number;
+  cached?: boolean;
+  metadata?: {
+    strategy: string;
+    timestamp: number;
+  };
+}
+
+interface DarwinGodelStep {
+  id: string;
+  type: 'darwin-godel' | 'verification' | 'extraction';
+  description: string;
+  input: string;
+  dependencies?: string[];
+  axioms?: string[];
+  hypotheses?: string[];
+  generations?: number;
 }
