@@ -63,40 +63,39 @@ class DarwinGodelEngine {
                         id: 'axiom-extraction',
                         type: 'darwin-godel',
                         description: 'Extract foundational axioms',
-                        input,
-                        axioms
+                        input
                     },
                     {
                         id: 'hypotheses-generation',
                         type: 'darwin-godel',
                         description: 'Generate initial hypotheses',
-                        input,
-                        hypotheses: initialHypotheses
+                        input
                     },
                     {
                         id: 'evolutionary-optimization',
                         type: 'darwin-godel',
                         description: 'Perform evolutionary optimization of hypotheses',
-                        input,
-                        hypotheses: initialHypotheses,
-                        generations: this.maxGenerations
+                        input
                     },
                     {
                         id: 'formal-verification',
-                        type: 'darwin-godel',
+                        type: 'verification',
                         description: 'Verify logical consistency of best hypothesis',
                         input
                     },
                     {
                         id: 'solution-extraction',
-                        type: 'darwin-godel',
+                        type: 'extraction',
                         description: 'Extract final solution from verified hypothesis',
                         input
                     }
                 ],
                 toolsRequired: [],
                 estimatedComplexity: 0.8,
-                cached: false
+                metadata: {
+                    strategy: 'darwin-godel',
+                    timestamp: Date.now()
+                }
             };
             this.eventBus.emit('darwin-godel.plan.generated', {
                 input,

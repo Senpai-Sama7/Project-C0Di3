@@ -144,6 +144,9 @@ export interface MemoryItem {
   key: string;
   content: unknown;
   timestamp?: number;
+  principles?: string[];
+  rules?: string[];
+  [key: string]: unknown;
 }
 
 /**
@@ -195,4 +198,69 @@ export interface LogEntry {
   level: 'info' | 'warn' | 'error';
   message: string;
   context?: Record<string, unknown>;
+}
+
+/**
+ * Reasoning Plan Structure (Generic Version for cross-module usage)
+ */
+export interface GenericReasoningPlan {
+  steps: GenericReasoningPlanStep[];
+  estimatedComplexity?: number;
+  toolsRequired?: string[];
+  metadata?: {
+    strategy: string;
+    timestamp: number;
+    version?: string;
+  };
+}
+
+/**
+ * Individual step in a generic reasoning plan
+ */
+export interface GenericReasoningPlanStep {
+  id: string;
+  type: 'generation' | 'tool' | 'darwin-godel' | 'absolute-zero' | 'verification' | 'extraction';
+  description: string;
+  input?: string;
+  dependencies?: string[];
+  tool?: string;
+  parameters?: Record<string, unknown>;
+  output?: unknown;
+  status?: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
+/**
+ * Context for reasoning operations
+ */
+export interface ReasoningContext extends AgentContext {
+  memories?: MemoryItem[];
+  relevantConcepts?: Concept[];
+  hypotheses?: string[];
+  axioms?: string[];
+  problem?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Population member for evolutionary algorithms
+ */
+export interface PopulationMember {
+  hypothesis: string;
+  fitness: number;
+  problem: string;
+  axioms: string[];
+  evaluated: boolean;
+  timestamp: number;
+  generation?: number;
+}
+
+/**
+ * Memory retrieval result
+ */
+export interface MemoryRetrievalResult {
+  memories: MemoryItem[];
+  fromCache: boolean;
+  cachedResult?: unknown;
+  retrievalTime?: number;
 }

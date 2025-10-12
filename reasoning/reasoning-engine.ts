@@ -1,7 +1,7 @@
 import { EventBus } from '../events/event-bus';
 import { MemorySystem } from '../memory/memory-system';
 import { ToolRegistry } from '../tools/tool-registry';
-import { LLMClient } from '../types';
+import { LLMClient, ReasoningContext, ReasoningOptions as ReasoningOpts, ToolCallResult as ToolResult } from '../types';
 import { Logger } from '../utils/logger';
 import { AbsoluteZeroReasoner } from './absolute-zero-reasoner';
 import { DarwinGodelEngine } from './darwin-godel-engine';
@@ -59,8 +59,8 @@ export class ReasoningEngine {
    */
   async generatePlan(
     input: string | Record<string, any>,
-    context: any,
-    options: ReasoningOptions = {}
+    context: ReasoningContext,
+    options: ReasoningOpts = {}
   ): Promise<ReasoningPlan> {
     const inputText = typeof input === 'string' ? input : JSON.stringify(input);
 
@@ -125,7 +125,7 @@ export class ReasoningEngine {
           reasoningPlan = await this.generateZeroShotPlan(inputText, context, memories);
           break;
         case 'darwin-godel':
-          reasoningPlan = await this.darwinGodelEngine.generatePlan(inputText, context, memories);
+          reasoningPlan = (await this.darwinGodelEngine.generatePlan(inputText, context, memories)) as any as ReasoningPlan;
           break;
         case 'absolute-zero':
           reasoningPlan = await this.absoluteZeroReasoner.generatePlan(inputText, context, memories);
@@ -497,14 +497,14 @@ export class ReasoningEngine {
     this.eventBus.emit('reasoning.mode.changed', { sessionId, mode });
   }
 
-  async orchestrateReasoning(input: string, context: any): Promise<any> {
+  async orchestrateReasoning(input: string, context: ReasoningContext): Promise<any> {
     this.logger.info('Orchestrating reasoning process for input:', input);
 
     const zeroShotPlan = this.zeroShotEnabled
-      ? await this.absoluteZeroReasoner.generatePlan(input, context, this.memory)
+      ? await this.absoluteZeroReasoner.generatePlan(input, context, [])
       : null;
 
-    const darwinPlan = await this.darwinGodelEngine.generatePlan(input, context, this.memory);
+    const darwinPlan: any = await this.darwinGodelEngine.generatePlan(input, context, []);
 
     const combinedPlan = {
       zeroShotPlan,
@@ -516,7 +516,7 @@ export class ReasoningEngine {
     return combinedPlan;
   }
 
-  async validateReasoningProcess(plan: any): Promise<boolean> {
+  async validateReasoningProcess(plan: ReasoningPlan): Promise<boolean> {
     this.logger.debug('Validating reasoning process');
     
     try {
@@ -622,7 +622,7 @@ export class ReasoningEngine {
   /**
    * Enhance context with relevant cybersecurity knowledge
    */
-  private async enhanceContextWithCybersecurityKnowledge(context: any): Promise<any> {
+  private async enhanceContextWithCybersecurityKnowledge(context: ReasoningContext): Promise<ReasoningContext> {
     if (!this.cybersecurityKnowledgeService) {
       return context;
     }
@@ -642,8 +642,10 @@ export class ReasoningEngine {
         });
 
         if (typeof knowledge === 'object' && knowledge !== null && 'concepts' in knowledge && Array.isArray(knowledge.concepts)) {
-          enhancedContext.cybersecurityKnowledge = enhancedContext.cybersecurityKnowledge || {};
-          enhancedContext.cybersecurityKnowledge[term] = knowledge;
+          if (!enhancedContext.cybersecurityKnowledge) {
+            enhancedContext.cybersecurityKnowledge = {} as Record<string, unknown>;
+          }
+          (enhancedContext.cybersecurityKnowledge as Record<string, unknown>)[term] = knowledge;
         }
       }
 
@@ -824,14 +826,17 @@ export interface GenerationStep extends BaseStep {
   input: string;
   context?: any;
   memories?: any[];
+  dependencies?: string[];
 }
 
 export interface ToolStep extends BaseStep {
   type: 'tool';
+  tool?: string;
   toolName: string;
   parameters: Record<string, any>;
   simulated?: boolean;
   simulationResult?: string;
+  dependencies?: string[];
 }
 
 export interface DarwinGodelStep extends BaseStep {
@@ -839,12 +844,14 @@ export interface DarwinGodelStep extends BaseStep {
   input: string;
   hypotheses?: string[];
   iterations?: number;
+  dependencies?: string[];
 }
 
 export interface AbsoluteZeroStep extends BaseStep {
   type: 'absolute-zero';
   input: string;
   groundingFacts?: string[];
+  dependencies?: string[];
 }
 
 export interface ReasoningStep {

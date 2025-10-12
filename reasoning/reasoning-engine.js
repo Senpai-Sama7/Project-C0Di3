@@ -110,7 +110,7 @@ class ReasoningEngine {
                         reasoningPlan = yield this.generateZeroShotPlan(inputText, context, memories);
                         break;
                     case 'darwin-godel':
-                        reasoningPlan = yield this.darwinGodelEngine.generatePlan(inputText, context, memories);
+                        reasoningPlan = (yield this.darwinGodelEngine.generatePlan(inputText, context, memories));
                         break;
                     case 'absolute-zero':
                         reasoningPlan = yield this.absoluteZeroReasoner.generatePlan(inputText, context, memories);
@@ -443,9 +443,9 @@ class ReasoningEngine {
         return __awaiter(this, void 0, void 0, function* () {
             this.logger.info('Orchestrating reasoning process for input:', input);
             const zeroShotPlan = this.zeroShotEnabled
-                ? yield this.absoluteZeroReasoner.generatePlan(input, context, this.memory)
+                ? yield this.absoluteZeroReasoner.generatePlan(input, context, [])
                 : null;
-            const darwinPlan = yield this.darwinGodelEngine.generatePlan(input, context, this.memory);
+            const darwinPlan = yield this.darwinGodelEngine.generatePlan(input, context, []);
             const combinedPlan = {
                 zeroShotPlan,
                 darwinPlan,
@@ -566,7 +566,9 @@ class ReasoningEngine {
                         includeTechniques: true
                     });
                     if (typeof knowledge === 'object' && knowledge !== null && 'concepts' in knowledge && Array.isArray(knowledge.concepts)) {
-                        enhancedContext.cybersecurityKnowledge = enhancedContext.cybersecurityKnowledge || {};
+                        if (!enhancedContext.cybersecurityKnowledge) {
+                            enhancedContext.cybersecurityKnowledge = {};
+                        }
                         enhancedContext.cybersecurityKnowledge[term] = knowledge;
                     }
                 }
