@@ -1,22 +1,66 @@
-.cursor/
-.env
-*.zip
-*.mp4
-node_modules/
-coverage/
-package-lock.json
-
-# Compiled JavaScript files
+# Build outputs
+dist/
 *.js
+*.js.map
+*.d.ts
 !jest.config.js
-!test-*.js
+!eslint.config.js
 !bin/*.js
 !scripts/*.js
+.tsbuildinfo
 
-# Advanced mode configuration
-.sensei
-artifacts/
+# Dependencies
+node_modules/
 
-# Test coverage reports
+# Testing
 coverage/
+.nyc_output/
 *.lcov
+
+# Environment
+.env
+.env.local
+.env.*.local
+.gitsensei
+.sensei
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.iml
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Data & Artifacts
+data/
+!data/.gitkeep
+artifacts/
+*.zip
+*.tar.gz
+*.mp4
+
+# Prisma
+prisma/migrations/*
+!prisma/migrations/.gitkeep
+
+# ESLint cache
+.eslintcache
